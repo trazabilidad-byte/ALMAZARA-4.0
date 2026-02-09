@@ -1,0 +1,46 @@
+
+/ (Root)
+├── .env.example                # Plantilla de variables
+├── README.md                   # Documentación principal
+├── package.json                # Dependencias y scripts
+├── vercel.json                 # Configuración de despliegue
+├── index.html                  # Punto de entrada HTML
+├── vite.config.ts              # Configuración de Vite (si aplica)
+│
+├── public/                     # Archivos estáticos públicos
+│   └── assets/                 # Logos, favicons, fuentes locales
+│
+├── src/                        # Código fuente
+│   ├── index.tsx               # Montaje de React
+│   ├── App.tsx                 # Enrutador y Layout principal
+│   ├── constants.tsx           # Constantes (Menú, Colores, Listas estáticas)
+│   ├── types.ts                # Definiciones de TypeScript e Interfaces
+│   │
+│   ├── lib/                    # Lógica de negocio y utilidades
+│   │   ├── supabase.ts         # Cliente de Supabase
+│   │   ├── utils.ts            # Funciones auxiliares (formateo moneda, fechas)
+│   │   └── pdfGenerator.ts     # Lógica de generación de reportes
+│   │
+│   └── components/             # Componentes de UI
+│       ├── AuthScreen.tsx      # Login y Registro
+│       ├── Sidebar.tsx         # Navegación lateral
+│       ├── KPICard.tsx         # Tarjetas de métricas
+│       ├── TankGrid.tsx        # Visualización de bodega
+│       ├── SuperAdminDashboard.tsx # Panel de gestión SaaS
+│       │
+│       ├── forms/              # Formularios complejos
+│       │   ├── ValesForm.tsx
+│       │   ├── ProducerForm.tsx
+│       │   └── CustomerForm.tsx
+│       │
+│       └── dashboards/         # Vistas principales por pestaña
+│           ├── DynamicDashboard.tsx
+│           ├── MillingControl.tsx
+│           ├── CellarDashboard.tsx
+│           ├── PackagingDashboard.tsx
+│           ├── SalesDashboard.tsx
+│           ├── TraceabilityDashboard.tsx
+│           └── SettingsDashboard.tsx
+│
+└── docs/                       # Documentación del proyecto
+    └── PRD.md                  # Documento de Requisitos del Producto
