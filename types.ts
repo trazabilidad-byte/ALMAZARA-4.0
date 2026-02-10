@@ -21,9 +21,9 @@ export enum OliveVariety {
 }
 
 export enum ValeStatus {
-  PENDIENTE = 'Pendiente',
-  MOLTURADO = 'Molturado',
-  VENDIDO_DIRECTO = 'Vendido Directamente'
+  PENDIENTE = 'PENDIENTE',
+  MOLTURADO = 'MOLTURADO',
+  VENDIDO_DIRECTO = 'VENDIDO_DIRECTO'
 }
 
 export enum ExitType {
@@ -32,8 +32,8 @@ export enum ExitType {
 }
 
 export enum ProducerStatus {
-  ACTIVE = 'Activo',
-  ARCHIVED = 'Archivado (Baja)'
+  ACTIVE = 'ACTIVE',
+  ARCHIVED = 'ARCHIVED'
 }
 
 export enum CustomerType {
@@ -162,6 +162,7 @@ export interface Producer {
   phone?: string;
   email?: string;
   status: ProducerStatus;
+  totalKgDelivered?: number; // Sincronizado con Supabase
 }
 
 export interface Tank {
@@ -214,6 +215,7 @@ export interface ProductionLot {
 }
 
 export interface Vale {
+  id: string; // UUID para sincronización con Supabase
   id_vale: number; // Secuencial por Almazara
   almazaraId: string; // Multi-tenant FK
   tipo_vale: ValeType;

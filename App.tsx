@@ -22,6 +22,17 @@ import { AuthScreen } from './components/AuthScreen';
 import { Tank, UserRole, Producer, Vale, Hopper, MillingLot, Customer, OilExit, OilMovement, NurseTank, PackagingLot, FinishedProduct, AuxEntry, AuxStock, SalesOrder, PomaceExit, AppConfig, User, ValeType, ValeStatus, OliveVariety, ExitType, ProductionLot } from './types';
 import { NAV_ITEMS } from './constants';
 import { Plus, CalendarRange, ShieldCheck } from 'lucide-react';
+import {
+  fetchProducers,
+  fetchVales,
+  fetchTanks,
+  fetchHoppers,
+  fetchMillingLots,
+  upsertProducer,
+  upsertTank,
+  upsertMillingLot,
+  upsertVale
+} from './src/lib/supabaseSync';
 
 const APP_NAME = "ALMAZARA PRIVADA 4.0";
 const CAMPAIGN = "2025/2026";
@@ -226,14 +237,32 @@ const App: React.FC = () => {
     else { setEditingVale(null); setIsValeReadOnly(false); setShowValesForm(true); }
   };
 
-  const handleValeSave = (v: Vale) => {
-    const updatedVales = editingVale ? vales.map(old => old.id_vale === v.id_vale ? v : old) : [...vales, v];
+  const handleValeSave = async (v: Vale) => {
+    // Asegurar que el vale tenga un ID (UUID) si es nuevo
+    const valeToSave = {
+      ...v,
+      id: v.id || crypto.randomUUID(),
+      almazaraId: currentUser?.almazaraId || 'private-user'
+    };
+
+    const updatedVales = editingVale
+      ? vales.map(old => old.id_vale === valeToSave.id_vale ? valeToSave : old)
+      : [...vales, valeToSave];
+
     setVales(updatedVales);
-    if (editingVale && v.milling_lot_id) {
-      const relevantVales = updatedVales.filter(item => item.milling_lot_id === v.milling_lot_id);
+
+    try {
+      await upsertVale(valeToSave);
+      console.log("Vale sincronizado con Supabase");
+    } catch (err) {
+      console.error("Error sincronizando vale:", err);
+    }
+
+    if (editingVale && valeToSave.milling_lot_id) {
+      const relevantVales = updatedVales.filter(item => item.milling_lot_id === valeToSave.milling_lot_id);
       const newTheoreticalOil = calculateTheoreticalOil(relevantVales);
       setMillingLots(prevLots => prevLots.map(lot => {
-        if (lot.id === v.milling_lot_id) {
+        if (lot.id === valeToSave.milling_lot_id) {
           return { ...lot, kilos_aceite_esperado: newTheoreticalOil };
         }
         return lot;
@@ -241,6 +270,81 @@ const App: React.FC = () => {
     }
     setShowValesForm(false);
   };
+
+  const handleProducerSave = async (p: Producer) => {
+    const producerToSave = {
+      ...p,
+      id: p.id || crypto.randomUUID(),
+      almazaraId: currentUser?.almazaraId || 'private-user'
+    };
+
+    const updatedProducers = editingProducer
+      ? producers.map(old => old.id === producerToSave.id ? producerToSave : old)
+      : [...producers, producerToSave];
+
+    setProducers(updatedProducers);
+
+    try {
+      await upsertProducer(producerToSave);
+      console.log("Productor sincronizado con Supabase");
+    } catch (err) {
+      console.error("Error sincronizando productor:", err);
+    }
+
+    setShowProducerForm(false);
+    setEditingProducer(null);
+  };
+
+  const handleCustomerSave = async (c: Customer) => {
+    const customerToSave = {
+      ...c,
+      id: c.id || crypto.randomUUID(),
+      almazaraId: currentUser?.almazaraId || 'private-user'
+    };
+
+    const updatedCustomers = editingCustomer
+      ? customers.map(old => old.id === customerToSave.id ? customerToSave : old)
+      : [...customers, customerToSave];
+
+    setCustomers(updatedCustomers);
+
+    // TODO: Implement upsertCustomer in supabaseSync.ts if needed
+    // For now, only local and localStorage via useEffect
+
+    setShowCustomerForm(false);
+    setEditingCustomer(null);
+  };
+
+  // --- LÓGICA DE CARGA DESDE SUPABASE ---
+  useEffect(() => {
+    if (isLoggedIn && currentUser) {
+      console.log("Cargando datos reales de Supabase para Almazara:", currentUser.almazaraId);
+
+      const loadData = async () => {
+        try {
+          const [p, v, t, h, m] = await Promise.all([
+            fetchProducers(),
+            fetchVales(),
+            fetchTanks(),
+            fetchHoppers(),
+            fetchMillingLots()
+          ]);
+
+          if (p.length > 0) setProducers(p);
+          if (v.length > 0) setVales(v);
+          if (t.length > 0) setTanks(t);
+          if (h.length > 0) setHoppers(h);
+          if (m.length > 0) setMillingLots(m);
+
+          console.log("Carga de datos completada exitosamente");
+        } catch (error) {
+          console.error("Error cargando datos de Supabase:", error);
+        }
+      };
+
+      loadData();
+    }
+  }, [isLoggedIn, currentUser]);
 
   // --- HANDLERS VENTAS ---
   const handleProcessSale = (order: SalesOrder) => {
@@ -569,8 +673,8 @@ const App: React.FC = () => {
         ) : (
           <div className="animate-in slide-in-from-top-4 duration-500">
             {showValesForm && <ValesForm producers={producers} hoppers={hoppers} vales={vales} lastValeId={vales.length} customers={customers} millingLots={millingLots} productionLots={productionLots} tanks={tanks} packagingLots={packagingLots} oilExits={oilExits} oilMovements={oilMovements} onSave={handleValeSave} onCancel={() => setShowValesForm(false)} editVale={editingVale} readOnly={isValeReadOnly} onViewLot={(lotId) => { setTraceSearchTerm(lotId); setActiveTab('traceability'); }} onViewProductionLot={(lpId) => { setExternalOpenProductionLotId(lpId); setActiveTab('milling'); }} onViewTank={(tankId) => { const t = tanks.find(x => x.id === tankId); if (t) { setActiveTab('cellar'); setTimeout(() => setSelectedProducer(null), 100); } }} />}
-            {showProducerForm && <ProducerForm onSave={(p) => { setProducers(editingProducer ? producers.map(o => o.id === p.id ? p : o) : [...producers, p]); setShowProducerForm(false); }} onCancel={() => setShowProducerForm(false)} initialData={editingProducer} />}
-            {showCustomerForm && <CustomerForm onSave={(c) => { setCustomers(editingCustomer ? customers.map(o => o.id === c.id ? c : o) : [...customers, c]); setShowCustomerForm(false); }} onCancel={() => setShowCustomerForm(false)} initialData={editingCustomer} />}
+            {showProducerForm && <ProducerForm onSave={handleProducerSave} onCancel={() => setShowProducerForm(false)} initialData={editingProducer} />}
+            {showCustomerForm && <CustomerForm onSave={handleCustomerSave} onCancel={() => setShowCustomerForm(false)} initialData={editingCustomer} />}
           </div>
         )}
       </main>
