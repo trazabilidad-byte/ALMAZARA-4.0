@@ -82,13 +82,13 @@ export interface Almazara {
   id: string; // UUID
   name: string;
   cif: string;
-  slug: string; 
+  slug: string;
   setupCompleted: boolean;
-  
+
   // Gestión Contractual
   contractMode: ContractMode;
   subscriptionStatus: SubscriptionStatus;
-  
+
   // SaaS Specifics
   planPriceMonthly?: number;
   nextPaymentDate?: string;
@@ -142,11 +142,11 @@ export interface OilMovement {
   batch_id?: string; // Nuevo: ID del lote generado (ej: "1/2/2025" para entrada a nodriza)
   // Nuevo: Detalles de cierre de lote (Hito)
   closureDetails?: {
-      startDate: string;
-      endDate: string;
-      valesIds: number[];
-      millingLots: string[];
-      totalKgConsolidated: number;
+    startDate: string;
+    endDate: string;
+    valesIds: number[];
+    millingLots: string[];
+    totalKgConsolidated: number;
   };
 }
 
@@ -244,16 +244,16 @@ export interface NurseTank {
   maxCapacityKg: number;
   currentKg: number;
   lastEntryDate: string | null;
-  lastSourceTankId: number | null; 
+  lastSourceTankId: number | null;
   lastEntryId: number;
   // Campos nuevos para trazabilidad Lote Entrada (LE)
   currentBatchId?: string; // El lote activo "1/2/2026"
-  currentVariety?: string; 
+  currentVariety?: string;
   currentQuality?: string;
 }
 
 export interface PackagingLot {
-  id: string; 
+  id: string;
   almazaraId: string;
   date: string;
   type: 'Filtrado' | 'Sin Filtrar';
@@ -263,15 +263,28 @@ export interface PackagingLot {
   kgUsed: number;
   bottleBatch: string;
   capBatch: string;
-  labelBatch: string; 
-  sourceInfo: string; 
+  labelBatch: string;
+  sourceInfo: string;
+  sourceTankId?: number; // Para trazabilidad directa bodega -> envasado
+  campaign?: string; // Nuevo para histórico
+}
+
+export interface OilMovement {
+  id: string; // "MOV-" + timestamp
+  almazaraId: string;
+  date: string;
+  source_tank_id: number;
+  target_tank_id: number; // 0 para salida (venta)
+  kg: number; // Kilos de ACEITE
+  variety: string;
+  operator: string;
   campaign?: string; // Nuevo para histórico
 }
 
 export interface FinishedProduct {
-  id: string; 
+  id: string;
   almazaraId: string;
-  lotId: string; 
+  lotId: string;
   format: '1L' | '2L' | '5L';
   type: 'Filtrado' | 'Sin Filtrar';
   unitsAvailable: number;
@@ -299,7 +312,7 @@ export interface AuxEntry {
   supplier: string;
   materialType: string; // Ahora es string dinámico basado en configuración
   quantity: number;
-  manufacturerBatch: string; 
+  manufacturerBatch: string;
   pricePerUnit: number;
   campaign?: string; // Nuevo para histórico
 }
@@ -321,8 +334,8 @@ export interface SalesOrder {
   date: string;
   customerId: string;
   products: {
-    finishedProductId: string; 
-    lotId: string; 
+    finishedProductId: string;
+    lotId: string;
     format: string;
     units: number;
     pricePerUnit: number;
@@ -338,8 +351,8 @@ export interface PomaceExit {
   date: string;
   customerId: string;
   kg: number;
-  valeNumber: string; 
-  notes: string; 
+  valeNumber: string;
+  notes: string;
   campaign?: string; // Nuevo para histórico
 }
 
@@ -347,8 +360,8 @@ export interface PomaceExit {
 
 export interface PackagingFormatDefinition {
   id: string;
-  name: string; 
-  capacityLiters: number; 
+  name: string;
+  capacityLiters: number;
   enabled: boolean;
 }
 
@@ -375,6 +388,7 @@ export interface AuthorizedUser {
   name: string;
   email: string;
   role: UserRole;
+  password?: string; // Opcional para usuarios de Supabase, obligatorio para locales
 }
 
 // Nuevo tipo para configuración de variedad
@@ -390,7 +404,7 @@ export interface AppConfig {
   province: string; // Nuevo
   zipCode: string; // Nuevo
   phone: string;
-  logoBase64?: string; 
+  logoBase64?: string;
   currentCampaign: string;
   pastCampaigns: string[]; // Lista de campañas archivadas
   oilDensity: number;
