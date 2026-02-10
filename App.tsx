@@ -21,7 +21,8 @@ import { DynamicDashboard } from './components/DynamicDashboard';
 import { AuthScreen } from './components/AuthScreen';
 import { Tank, UserRole, Producer, Vale, Hopper, MillingLot, Customer, OilExit, OilMovement, NurseTank, PackagingLot, FinishedProduct, AuxEntry, AuxStock, SalesOrder, PomaceExit, AppConfig, User, UserRole as Role, ValeType, ValeStatus, OliveVariety, ExitType, ProductionLot } from './types';
 import { NAV_ITEMS } from './constants';
-import { Plus, CalendarRange, ShieldCheck } from 'lucide-react';
+import { Plus, CalendarRange, ShieldCheck, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { useOfflineSync } from './src/lib/useOfflineSync';
 import {
   fetchProducers,
   fetchVales,
@@ -109,6 +110,8 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('sidebar_collapsed');
     return saved === 'true';
   });
+
+  const { isOnline, isSyncing, pendingCount } = useOfflineSync();
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed(prev => {
@@ -641,11 +644,24 @@ const App: React.FC = () => {
           <>
             <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
               <div>
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
                   <span className="px-2 py-0.5 rounded-md bg-black text-[#D9FF66] text-[10px] font-black uppercase tracking-widest">{String(appConfig.companyName)}</span>
                   <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#D9FF66] text-black text-[10px] font-black uppercase tracking-widest border border-black/10">
                     <CalendarRange size={10} /> Campaña: {String(appConfig.currentCampaign)}
                   </span>
+
+                  {/* Indicador de Sincronización Offline */}
+                  <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest border ${isOnline ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
+                    {isOnline ? <Wifi size={10} /> : <WifiOff size={10} />}
+                    {isOnline ? 'Online' : 'Trabajando Offline'}
+                  </div>
+
+                  {pendingCount > 0 && (
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest animate-pulse">
+                      <RefreshCw size={10} className={isSyncing ? 'animate-spin' : ''} />
+                      {pendingCount} Pendientes de subir
+                    </div>
+                  )}
                 </div>
                 <h1 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tighter text-[#111111] uppercase">
                   {String(NAV_ITEMS.find(n => n.id === activeTab)?.label || 'Panel de Control')}
