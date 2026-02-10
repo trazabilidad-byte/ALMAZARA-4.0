@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { Producer, Vale, MillingLot, AppConfig, Tank, Hopper, UserRole, ProducerStatus, ValeStatus, OliveVariety, Customer, ProductionLot, PackagingLot, OilMovement, SalesOrder, PomaceExit, AuxEntry, CustomerStatus, OilExit } from '../../types';
 
-export const ALMAZARA_ID = '9e3f173e-1b36-4830-8213-e57dc8e59b3b';
+export const ALMAZARA_ID = import.meta.env.VITE_ALMAZARA_ID || 'private-user';
 
 // --- PRODUCTORES ---
 export const fetchProducers = async (): Promise<Producer[]> => {
