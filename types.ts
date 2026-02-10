@@ -271,18 +271,6 @@ export interface PackagingLot {
   campaign?: string; // Nuevo para histórico
 }
 
-export interface OilMovement {
-  id: string; // "MOV-" + timestamp
-  almazaraId: string;
-  date: string;
-  source_tank_id: number;
-  target_tank_id: number; // 0 para salida (venta)
-  kg: number; // Kilos de ACEITE
-  variety: string;
-  operator: string;
-  campaign?: string; // Nuevo para histórico
-}
-
 export interface FinishedProduct {
   id: string;
   almazaraId: string;

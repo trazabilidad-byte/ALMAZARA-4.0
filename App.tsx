@@ -31,7 +31,23 @@ import {
   upsertProducer,
   upsertTank,
   upsertMillingLot,
-  upsertVale
+  upsertVale,
+  upsertProductionLot,
+  upsertPackagingLot,
+  upsertOilMovement,
+  upsertSalesOrder,
+  upsertPomaceExit,
+  upsertAuxEntry,
+  upsertOilExit,
+  upsertCustomer,
+  fetchCustomers,
+  fetchProductionLots,
+  fetchPackagingLots,
+  fetchOilMovements,
+  fetchSalesOrders,
+  fetchPomaceExits,
+  fetchAuxEntries,
+  fetchOilExits
 } from './src/lib/supabaseSync';
 
 const APP_NAME = "ALMAZARA PRIVADA 4.0";
@@ -308,8 +324,12 @@ const App: React.FC = () => {
 
     setCustomers(updatedCustomers);
 
-    // TODO: Implement upsertCustomer in supabaseSync.ts if needed
-    // For now, only local and localStorage via useEffect
+    try {
+      await upsertCustomer(customerToSave);
+      console.log("Cliente sincronizado con Supabase");
+    } catch (err) {
+      console.error("Error sincronizando cliente:", err);
+    }
 
     setShowCustomerForm(false);
     setEditingCustomer(null);
@@ -322,12 +342,20 @@ const App: React.FC = () => {
 
       const loadData = async () => {
         try {
-          const [p, v, t, h, m] = await Promise.all([
+          const [p, v, t, h, m, c, pl, pk, om, so, pe, ae, oe] = await Promise.all([
             fetchProducers(),
             fetchVales(),
             fetchTanks(),
             fetchHoppers(),
-            fetchMillingLots()
+            fetchMillingLots(),
+            fetchCustomers(),
+            fetchProductionLots(),
+            fetchPackagingLots(),
+            fetchOilMovements(),
+            fetchSalesOrders(),
+            fetchPomaceExits(),
+            fetchAuxEntries(),
+            fetchOilExits()
           ]);
 
           if (p.length > 0) setProducers(p);
@@ -335,10 +363,18 @@ const App: React.FC = () => {
           if (t.length > 0) setTanks(t);
           if (h.length > 0) setHoppers(h);
           if (m.length > 0) setMillingLots(m);
+          if (c.length > 0) setCustomers(c);
+          if (pl.length > 0) setProductionLots(pl);
+          if (pk.length > 0) setPackagingLots(pk);
+          if (om.length > 0) setOilMovements(om);
+          if (so.length > 0) setSalesOrders(so);
+          if (pe.length > 0) setPomaceExits(pe);
+          if (ae.length > 0) setAuxEntries(ae);
+          if (oe.length > 0) setOilExits(oe);
 
-          console.log("Carga de datos completada exitosamente");
+          console.log("Carga de datos transaccionales completada");
         } catch (error) {
-          console.error("Error cargando datos de Supabase:", error);
+          console.error("Error cargando históricos de Supabase:", error);
         }
       };
 
@@ -347,26 +383,47 @@ const App: React.FC = () => {
   }, [isLoggedIn, currentUser]);
 
   // --- HANDLERS VENTAS ---
-  const handleProcessSale = (order: SalesOrder) => {
-    setSalesOrders(prev => [...prev, order]);
+  const handleProcessSale = async (order: SalesOrder) => {
+    const orderToSave = {
+      ...order,
+      almazaraId: currentUser?.almazaraId || 'private'
+    };
+    setSalesOrders(prev => [...prev, orderToSave]);
     // Actualizar Stock de Producto Terminado
     setFinishedProducts(prev => prev.map(fp => {
-      const line = order.products.find(p => p.finishedProductId === fp.id);
+      const line = orderToSave.products.find(p => p.finishedProductId === fp.id);
       if (line) {
         return { ...fp, unitsAvailable: fp.unitsAvailable - line.units };
       }
       return fp;
     }));
+
+    try {
+      await upsertSalesOrder(orderToSave);
+      console.log("Pedido de venta sincronizado");
+    } catch (err) {
+      console.error("Error sincronizando venta:", err);
+    }
   };
 
-  const handleProcessPomaceExit = (exit: PomaceExit) => {
-    setPomaceExits(prev => [...prev, exit]);
+  const handleProcessPomaceExit = async (exit: PomaceExit) => {
+    const exitToSave = {
+      ...exit,
+      almazaraId: currentUser?.almazaraId || 'private'
+    };
+    setPomaceExits(prev => [...prev, exitToSave]);
+    try {
+      await upsertPomaceExit(exitToSave);
+      console.log("Salida de orujo sincronizada");
+    } catch (err) {
+      console.error("Error sincronizando salida de orujo:", err);
+    }
   };
 
-  const handleProcessBulkExit = (data: { customerId: string, date: string, driver: string, plate: string, seals: string, deliveryNote: string, sources: { tankId: number, kg: number }[] }) => {
+  const handleProcessBulkExit = async (data: { customerId: string, date: string, driver: string, plate: string, seals: string, deliveryNote: string, sources: { tankId: number, kg: number }[] }) => {
     const newExits: OilExit[] = data.sources.map((s, idx) => ({
       id: `EXIT-${Date.now()}-${s.tankId}-${idx}`,
-      almazaraId: 'private',
+      almazaraId: currentUser?.almazaraId || 'private',
       tank_id: s.tankId,
       type: ExitType.CISTERNA,
       date: data.date,
@@ -376,13 +433,14 @@ const App: React.FC = () => {
       driver_name: data.driver,
       license_plate: data.plate,
       seals: data.seals,
-      deliveryNote: data.deliveryNote
+      deliveryNote: data.deliveryNote,
+      campaign: appConfig.currentCampaign
     }));
 
     setOilExits(prev => [...prev, ...newExits]);
 
-    // Actualizar Depósitos (Sumando todas las extracciones del mismo depósito)
-    setTanks(prev => prev.map(t => {
+    // Actualizar Depósitos
+    const updatedTanks = tanks.map(t => {
       const totalKgToSubtract = data.sources
         .filter(s => s.tankId === t.id)
         .reduce((acc, s) => acc + s.kg, 0);
@@ -391,20 +449,34 @@ const App: React.FC = () => {
         return { ...t, currentKg: t.currentKg - totalKgToSubtract };
       }
       return t;
-    }));
+    });
+    setTanks(updatedTanks);
 
-    // Registrar Movimiento Salida (Con IDs únicos por línea)
+    // Registrar Movimiento Salida
     const newMovements: OilMovement[] = data.sources.map((s, idx) => ({
       id: `MOV-EXIT-${Date.now()}-${s.tankId}-${idx}`,
-      almazaraId: 'private',
+      almazaraId: currentUser?.almazaraId || 'private',
       date: data.date,
       source_tank_id: s.tankId,
       target_tank_id: 0, // Salida externa
       kg: s.kg,
       variety: 'Venta Granel',
-      operator: 'Admin'
+      operator: currentUser?.fullName || 'Admin',
+      campaign: appConfig.currentCampaign
     }));
     setOilMovements(prev => [...prev, ...newMovements]);
+
+    try {
+      await Promise.all(newExits.map(e => upsertOilExit(e)));
+      await Promise.all(newMovements.map(m => upsertOilMovement(m)));
+      await Promise.all(data.sources.map(s => {
+        const t = updatedTanks.find(tank => tank.id === s.tankId);
+        return t ? upsertTank(t) : Promise.resolve();
+      }));
+      console.log("Salida a granel sincronizada con éxito");
+    } catch (err) {
+      console.error("Error sincronizando salida a granel:", err);
+    }
   };
 
   const handleStartCampaign = (nextCampaign: string) => {
@@ -565,7 +637,7 @@ const App: React.FC = () => {
       case 'producers': if (selectedProducer) return <ProducerDetail producer={selectedProducer} vales={vales} onBack={() => setSelectedProducer(null)} onViewVale={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onEdit={() => { setEditingProducer(selectedProducer); setShowProducerForm(true); }} onArchive={() => { }} onDelete={() => { }} appConfig={appConfig} />; return <ProducersList producers={producers} onSelect={setSelectedProducer} />;
       case 'customers': if (selectedCustomer) return <CustomerDetail customer={selectedCustomer} oilExits={fExits} vales={vales} salesOrders={fSales} pomaceExits={pomaceExits} onBack={() => setSelectedCustomer(null)} onEdit={() => { setEditingCustomer(selectedCustomer); setShowCustomerForm(true); }} onArchive={() => { }} onDelete={() => { }} />; return <CustomersList customers={customers} onSelect={setSelectedCustomer} />;
       case 'vales': return <ValesList vales={fVales} onEdit={(v) => { setEditingVale(v); setIsValeReadOnly(false); setShowValesForm(true); }} onView={(v) => { setTraceSearchTerm(String(v.id_vale)); setActiveTab('traceability'); }} onViewProducer={(name) => { const p = producers.find(x => x.name === name); if (p) { setSelectedProducer(p); setActiveTab('producers'); } }} onUpdateAnalitica={() => { }} />;
-      case 'milling': return <MillingControl hoppers={hoppers} pendingVales={vales.filter(v => v.estado === ValeStatus.PENDIENTE)} allVales={vales} tanks={tanks} millingLots={fMilling} productionLots={fProdLots} appConfig={appConfig} initialViewProductionLotId={externalOpenProductionLotId} onProcessLot={(data) => { const newId = `MT${data.hopperId}/${data.uso}`; if (millingLots.some(lot => lot.id === newId)) { console.warn(`Intento de duplicación de lote MT prevenido: ${newId}`); return; } const activeVales = vales.filter(v => v.ubicacion_id === data.hopperId && v.uso_contador === data.uso && v.estado === ValeStatus.PENDIENTE); const totalKgAceituna = activeVales.reduce((acc, v) => acc + v.kilos_netos, 0); const totalAceiteTeorico = calculateTheoreticalOil(activeVales); const variedadLote = activeVales.length > 0 ? activeVales[0].variedad : OliveVariety.PICUAL; const newLot: MillingLot = { id: newId, almazaraId: 'private', fecha: data.date, tolva_id: data.hopperId, uso_contador: data.uso, kilos_aceituna: totalKgAceituna, kilos_aceite_esperado: totalAceiteTeorico, kilos_aceite_real: data.realOil, deposito_id: data.targetTankId, variedad: variedadLote, vales_ids: activeVales.map(v => v.id_vale), campaign: appConfig.currentCampaign }; setMillingLots([...millingLots, newLot]); setVales(vales.map(v => v.ubicacion_id === data.hopperId && v.uso_contador === data.uso ? { ...v, milling_lot_id: newLot.id } : v)); }} onViewLotDetail={(lotId) => { setTraceSearchTerm(lotId); setActiveTab('traceability'); }} onViewValeDetails={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onDayClose={(data) => { const dateObj = new Date(data.productionDate); const dateStr = dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }); let newLPId = ''; let totalOliveKg = 0; let totalRealOilKg = 0; let allMillingLotsIds: string[] = []; let yieldFactor = 0; let oilDifference = 0; const newLots = millingLots.filter(l => data.selectedLotIds.includes(l.id)); const newLotsOliveKg = newLots.reduce((acc, l) => acc + l.kilos_aceituna, 0); const newRealOilInput = data.totalRealOil; if (data.mergeWithLpId) { const existingLP = productionLots.find(lp => lp.id === data.mergeWithLpId); if (!existingLP) return alert("Error crítico: Tanda a fusionar no encontrada."); newLPId = existingLP.id; allMillingLotsIds = [...existingLP.millingLotsIds, ...data.selectedLotIds]; totalOliveKg = existingLP.totalOliveKg + newLotsOliveKg; totalRealOilKg = existingLP.totalRealOilKg + newRealOilInput; oilDifference = newRealOilInput; } else { const baseId = `LP-${dateStr}`; let suffix = ''; let counter = 1; while (productionLots.some(lp => lp.id === baseId + suffix)) { suffix = `-${String.fromCharCode(65 + counter)}`; counter++; } newLPId = baseId + suffix; allMillingLotsIds = data.selectedLotIds; totalOliveKg = newLotsOliveKg; totalRealOilKg = newRealOilInput; oilDifference = newRealOilInput; } yieldFactor = totalOliveKg > 0 ? totalRealOilKg / totalOliveKg : 0; const updatedMillingLots = millingLots.map(lot => { if (allMillingLotsIds.includes(lot.id)) { return { ...lot, kilos_aceite_real: lot.kilos_aceituna * yieldFactor, deposito_id: data.targetTankId }; } return lot; }); setMillingLots(updatedMillingLots); const updatedVales = vales.map(v => { if (v.milling_lot_id && allMillingLotsIds.includes(v.milling_lot_id)) { return { ...v, estado: ValeStatus.MOLTURADO }; } return v; }); setVales(updatedVales); const newProductionLot: ProductionLot = { id: newLPId, almazaraId: 'private', fecha: data.productionDate, millingLotsIds: allMillingLotsIds, totalOliveKg: totalOliveKg, totalRealOilKg: totalRealOilKg, targetTankId: data.targetTankId, notes: data.notes, campaign: appConfig.currentCampaign }; if (data.mergeWithLpId) { setProductionLots(prev => prev.map(lp => lp.id === data.mergeWithLpId ? newProductionLot : lp)); } else { setProductionLots(prev => [...prev, newProductionLot]); } setTanks(prev => prev.map(t => { if (t.id === data.targetTankId) { const newKg = t.currentKg + oilDifference; const shouldClose = newKg >= t.maxCapacityKg; return { ...t, currentKg: newKg, variety_id: t.currentKg === 0 && newLots.length > 0 ? String(newLots[0].variedad) : t.variety_id, status: shouldClose ? 'FULL' : t.status, currentBatchId: newLPId }; } return t; })); const movementType = data.mergeWithLpId ? 'Ajuste Fusión Tanda' : 'Entrada Molturación (Tanda)'; const adjustmentMovement: OilMovement = { id: `PROD-${newLPId}-${Date.now()}`, almazaraId: 'private', date: new Date().toISOString(), source_tank_id: data.targetTankId, target_tank_id: data.targetTankId, kg: oilDifference, variety: movementType, operator: OWNER_NAME, batch_id: newLPId, campaign: appConfig.currentCampaign, closureDetails: { startDate: data.productionDate, endDate: new Date().toISOString(), valesIds: [], millingLots: data.selectedLotIds, totalKgConsolidated: totalRealOilKg } }; setOilMovements(prev => [...prev, adjustmentMovement]); }} />;
+      case 'milling': return <MillingControl hoppers={hoppers} pendingVales={vales.filter(v => v.estado === ValeStatus.PENDIENTE)} allVales={vales} tanks={tanks} millingLots={fMilling} productionLots={fProdLots} appConfig={appConfig} initialViewProductionLotId={externalOpenProductionLotId} onProcessLot={async (data) => { const newId = `MT${data.hopperId}/${data.uso}`; if (millingLots.some(lot => lot.id === newId)) { console.warn(`Intento de duplicación de lote MT prevenido: ${newId}`); return; } const activeVales = vales.filter(v => v.ubicacion_id === data.hopperId && v.uso_contador === data.uso && v.estado === ValeStatus.PENDIENTE); const totalKgAceituna = activeVales.reduce((acc, v) => acc + v.kilos_netos, 0); const totalAceiteTeorico = calculateTheoreticalOil(activeVales); const variedadLote = activeVales.length > 0 ? activeVales[0].variedad : OliveVariety.PICUAL; const newLot: MillingLot = { id: newId, almazaraId: currentUser?.almazaraId || 'private', fecha: data.date, tolva_id: data.hopperId, uso_contador: data.uso, kilos_aceituna: totalKgAceituna, kilos_aceite_esperado: totalAceiteTeorico, kilos_aceite_real: data.realOil, deposito_id: data.targetTankId, variedad: variedadLote, vales_ids: activeVales.map(v => v.id_vale), campaign: appConfig.currentCampaign }; setMillingLots([...millingLots, newLot]); const updatedVales = vales.map(v => v.ubicacion_id === data.hopperId && v.uso_contador === data.uso ? { ...v, milling_lot_id: newLot.id } : v); setVales(updatedVales); try { await upsertMillingLot(newLot); await Promise.all(updatedVales.filter(v => v.milling_lot_id === newLot.id).map(v => upsertVale(v))); console.log("Lote de molturación y vales sincronizados"); } catch (err) { console.error("Error sincronizando proceso de molturación:", err); } }} onViewLotDetail={(lotId) => { setTraceSearchTerm(lotId); setActiveTab('traceability'); }} onViewValeDetails={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onDayClose={async (data) => { const dateObj = new Date(data.productionDate); const dateStr = dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }); let newLPId = ''; let totalOliveKg = 0; let totalRealOilKg = 0; let allMillingLotsIds: string[] = []; let yieldFactor = 0; let oilDifference = 0; const newLots = millingLots.filter(l => data.selectedLotIds.includes(l.id)); const newLotsOliveKg = newLots.reduce((acc, l) => acc + l.kilos_aceituna, 0); const newRealOilInput = data.totalRealOil; if (data.mergeWithLpId) { const existingLP = productionLots.find(lp => lp.id === data.mergeWithLpId); if (!existingLP) return alert("Error crítico: Tanda a fusionar no encontrada."); newLPId = existingLP.id; allMillingLotsIds = [...existingLP.millingLotsIds, ...data.selectedLotIds]; totalOliveKg = existingLP.totalOliveKg + newLotsOliveKg; totalRealOilKg = existingLP.totalRealOilKg + newRealOilInput; oilDifference = newRealOilInput; } else { const baseId = `LP-${dateStr}`; let suffix = ''; let counter = 1; while (productionLots.some(lp => lp.id === baseId + suffix)) { suffix = `-${String.fromCharCode(65 + counter)}`; counter++; } newLPId = baseId + suffix; allMillingLotsIds = data.selectedLotIds; totalOliveKg = newLotsOliveKg; totalRealOilKg = newRealOilInput; oilDifference = newRealOilInput; } yieldFactor = totalOliveKg > 0 ? totalRealOilKg / totalOliveKg : 0; const updatedMillingLotsState = millingLots.map(lot => { if (allMillingLotsIds.includes(lot.id)) { return { ...lot, kilos_aceite_real: lot.kilos_aceituna * yieldFactor, deposito_id: data.targetTankId }; } return lot; }); setMillingLots(updatedMillingLotsState); const updatedVales = vales.map(v => { if (v.milling_lot_id && allMillingLotsIds.includes(v.milling_lot_id)) { return { ...v, estado: ValeStatus.MOLTURADO }; } return v; }); setVales(updatedVales); const newProductionLot: ProductionLot = { id: newLPId, almazaraId: currentUser?.almazaraId || 'private', fecha: data.productionDate, millingLotsIds: allMillingLotsIds, totalOliveKg: totalOliveKg, totalRealOilKg: totalRealOilKg, targetTankId: data.targetTankId, notes: data.notes, campaign: appConfig.currentCampaign }; if (data.mergeWithLpId) { setProductionLots(prev => prev.map(lp => lp.id === data.mergeWithLpId ? newProductionLot : lp)); } else { setProductionLots(prev => [...prev, newProductionLot]); } const targetTank = tanks.find(t => t.id === data.targetTankId); const updatedTanks = tanks.map(t => { if (t.id === data.targetTankId) { const newKg = t.currentKg + oilDifference; const shouldClose = newKg >= t.maxCapacityKg; return { ...t, currentKg: newKg, variety_id: t.currentKg === 0 && newLots.length > 0 ? String(newLots[0].variedad) : t.variety_id, status: shouldClose ? 'FULL' : t.status, currentBatchId: newLPId }; } return t; }); setTanks(updatedTanks); const movementType = data.mergeWithLpId ? 'Ajuste Fusión Tanda' : 'Entrada Molturación (Tanda)'; const adjustmentMovement: OilMovement = { id: `PROD-${newLPId}-${Date.now()}`, almazaraId: currentUser?.almazaraId || 'private', date: new Date().toISOString(), source_tank_id: data.targetTankId, target_tank_id: data.targetTankId, kg: oilDifference, variety: movementType, operator: OWNER_NAME, batch_id: newLPId, campaign: appConfig.currentCampaign, closureDetails: { startDate: data.productionDate, endDate: new Date().toISOString(), valesIds: [], millingLots: data.selectedLotIds, totalKgConsolidated: totalRealOilKg } }; setOilMovements(prev => [...prev, adjustmentMovement]); try { await upsertProductionLot(newProductionLot); await Promise.all(updatedMillingLotsState.filter(l => allMillingLotsIds.includes(l.id)).map(l => upsertMillingLot(l))); await Promise.all(updatedVales.filter(v => v.milling_lot_id && allMillingLotsIds.includes(v.milling_lot_id)).map(v => upsertVale(v))); await upsertOilMovement(adjustmentMovement); const tankToUpdate = updatedTanks.find(t => t.id === data.targetTankId); if (tankToUpdate) await upsertTank(tankToUpdate); console.log("Tanda diaria y movimientos sincronizados"); } catch (err) { console.error("Error sincronizando cierre del día:", err); } }} />;
       case 'sales':
         return (
           <SalesDashboard
@@ -586,7 +658,42 @@ const App: React.FC = () => {
             }}
           />
         );
-      case 'cellar': return <CellarDashboard tanks={tanks} millingLots={millingLots} vales={vales} producers={producers} oilMovements={oilMovements} oilExits={oilExits} productionLots={productionLots} initialSelectedTankId={externalOpenTankId} onTransfer={(data) => { setTanks(tanks.map(t => { if (t.id === data.sourceTankId) return { ...t, currentKg: t.currentKg - data.kg }; if (t.id === data.targetTankId) { const newKg = t.currentKg + data.kg; const isFull = newKg >= t.maxCapacityKg; return { ...t, currentKg: newKg, variety_id: tanks.find(s => s.id === data.sourceTankId)?.variety_id, status: isFull ? 'FULL' : t.status }; } return t; })); setOilMovements([...oilMovements, { id: `MOV-${Date.now()}`, almazaraId: 'private', date: data.date, source_tank_id: data.sourceTankId, target_tank_id: data.targetTankId, kg: data.kg, variety: 'Trasiego', operator: OWNER_NAME }]); }} onResetTank={(tankId) => { setTanks(prev => prev.map(t => { if (t.id !== tankId) return t; const newCycle = (t.cycleCount || 1) + 1; return { ...t, cycleCount: newCycle, currentKg: 0, variety_id: undefined, currentBatchId: `BATCH-${t.id}-${newCycle}-${Date.now()}`, status: 'FILLING' }; })); }} onCloseTankLot={(tankId) => { const tank = tanks.find(t => t.id === tankId); if (!tank) return; const closureMovement: OilMovement = { id: `CLOSURE-${tankId}-${Date.now()}`, almazaraId: 'private', date: new Date().toISOString(), source_tank_id: tankId, target_tank_id: tankId, kg: tank.currentKg, variety: tank.variety_id || 'Mezcla', operator: OWNER_NAME }; setOilMovements([...oilMovements, closureMovement]); setTanks(prev => prev.map(t => t.id === tankId ? { ...t, status: 'FULL' } : t)); }} onViewLot={(lotId) => { setTraceSearchTerm(lotId); setActiveTab('traceability'); }} onViewProductionLot={(lpId) => { setExternalOpenProductionLotId(lpId); setActiveTab('milling'); }} onViewVale={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onViewProducer={(producerId) => { const p = producers.find(x => x.id === producerId); if (p) { setSelectedProducer(p); setActiveTab('producers'); } }} onViewExit={(exit) => { setTraceSearchTerm(exit.id); setActiveTab('traceability'); }} />;
+      case 'cellar': return <CellarDashboard tanks={tanks} millingLots={millingLots} vales={vales} producers={producers} oilMovements={oilMovements} oilExits={oilExits} productionLots={productionLots} initialSelectedTankId={externalOpenTankId} onTransfer={async (data) => {
+        const sourceTank = tanks.find(t => t.id === data.sourceTankId);
+        const targetTank = tanks.find(t => t.id === data.targetTankId);
+        const updatedTanks = tanks.map(t => {
+          if (t.id === data.sourceTankId) return { ...t, currentKg: t.currentKg - data.kg };
+          if (t.id === data.targetTankId) {
+            const newKg = t.currentKg + data.kg;
+            const isFull = newKg >= t.maxCapacityKg;
+            return { ...t, currentKg: newKg, variety_id: sourceTank?.variety_id, status: isFull ? 'FULL' : t.status };
+          }
+          return t;
+        });
+        setTanks(updatedTanks);
+        const newMovement: OilMovement = {
+          id: `MOV-${Date.now()}`,
+          almazaraId: currentUser?.almazaraId || 'private',
+          date: data.date,
+          source_tank_id: data.sourceTankId,
+          target_tank_id: data.targetTankId,
+          kg: data.kg,
+          variety: 'Trasiego',
+          operator: currentUser?.fullName || OWNER_NAME,
+          campaign: appConfig.currentCampaign
+        };
+        setOilMovements([...oilMovements, newMovement]);
+        try {
+          await upsertOilMovement(newMovement);
+          const sT = updatedTanks.find(t => t.id === data.sourceTankId);
+          const tT = updatedTanks.find(t => t.id === data.targetTankId);
+          if (sT) await upsertTank(sT);
+          if (tT) await upsertTank(tT);
+          console.log("Trasiego sincronizado con Supabase");
+        } catch (err) {
+          console.error("Error sincronizando trasiego:", err);
+        }
+      }} onResetTank={(tankId) => { setTanks(prev => prev.map(t => { if (t.id !== tankId) return t; const newCycle = (t.cycleCount || 1) + 1; return { ...t, cycleCount: newCycle, currentKg: 0, variety_id: undefined, currentBatchId: `BATCH-${t.id}-${newCycle}-${Date.now()}`, status: 'FILLING' }; })); }} onCloseTankLot={async (tankId) => { const tank = tanks.find(t => t.id === tankId); if (!tank) return; const closureMovement: OilMovement = { id: `CLOSURE-${tankId}-${Date.now()}`, almazaraId: currentUser?.almazaraId || 'private', date: new Date().toISOString(), source_tank_id: tankId, target_tank_id: tankId, kg: tank.currentKg, variety: tank.variety_id || 'Mezcla', operator: currentUser?.fullName || OWNER_NAME, campaign: appConfig.currentCampaign }; setOilMovements([...oilMovements, closureMovement]); const updatedTanks = tanks.map(t => t.id === tankId ? { ...t, status: 'FULL' } : t); setTanks(updatedTanks); try { await upsertOilMovement(closureMovement); const tT = updatedTanks.find(t => t.id === tankId); if (tT) await upsertTank(tT); console.log("Cierre de depósito sincronizado"); } catch (err) { console.error("Error sincronizando cierre:", err); } }} onViewLot={(lotId) => { setTraceSearchTerm(lotId); setActiveTab('traceability'); }} onViewProductionLot={(lpId) => { setExternalOpenProductionLotId(lpId); setActiveTab('milling'); }} onViewVale={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onViewProducer={(producerId) => { const p = producers.find(x => x.id === producerId); if (p) { setSelectedProducer(p); setActiveTab('producers'); } }} onViewExit={(exit) => { setTraceSearchTerm(exit.id); setActiveTab('traceability'); }} />;
 
       case 'packaging': return <PackagingDashboard
         tanks={tanks}
@@ -599,38 +706,74 @@ const App: React.FC = () => {
           return { ...e, remaining: e.quantity, category: def ? def.category : 'Otro' };
         })}
         oilMovements={fMovements}
-        onFillNurseTank={(kg, sourceId, date) => {
+        onFillNurseTank={async (kg, sourceId, date) => {
           const currentYear = new Date(date).getFullYear();
           const previousTransfers = oilMovements.filter(m => m.source_tank_id === sourceId && m.target_tank_id === 999 && new Date(m.date).getFullYear() === currentYear).length;
           const nextSequence = previousTransfers + 1;
           const batchId = `${sourceId}/${nextSequence}/${currentYear}`;
           const sourceTank = tanks.find(t => t.id === sourceId);
           const variety = sourceTank?.variety_id || 'Mezcla';
-          setNurseTank({ ...nurseTank, currentKg: nurseTank.currentKg + kg, lastEntryDate: date, lastSourceTankId: sourceId, lastEntryId: nextSequence, currentBatchId: batchId, currentVariety: variety });
-          setTanks(tanks.map(t => t.id === sourceId ? { ...t, currentKg: t.currentKg - kg } : t));
-          const newMovement = { id: `MOV-NURSE-${Date.now()}`, almazaraId: 'private', date: date, source_tank_id: sourceId, target_tank_id: 999, kg: kg, variety: variety, operator: OWNER_NAME, batch_id: batchId, campaign: appConfig.currentCampaign };
+          const updatedNurseTank = { ...nurseTank, currentKg: nurseTank.currentKg + kg, lastEntryDate: date, lastSourceTankId: sourceId, lastEntryId: nextSequence, currentBatchId: batchId, currentVariety: variety };
+          setNurseTank(updatedNurseTank);
+          const updatedTanks = tanks.map(t => t.id === sourceId ? { ...t, currentKg: t.currentKg - kg } : t);
+          setTanks(updatedTanks);
+          const newMovement: OilMovement = { id: `MOV-NURSE-${Date.now()}`, almazaraId: currentUser?.almazaraId || 'private', date: date, source_tank_id: sourceId, target_tank_id: 999, kg: kg, variety: variety, operator: currentUser?.fullName || OWNER_NAME, batch_id: batchId, campaign: appConfig.currentCampaign };
           setOilMovements(prev => [...prev, newMovement]);
-        }} onPackagingRun={(lot) => {
-          const lotWithCampaign = { ...lot, campaign: appConfig.currentCampaign };
-          setPackagingLots([...packagingLots, lotWithCampaign]);
+          try {
+            await upsertOilMovement(newMovement);
+            const sT = updatedTanks.find(t => t.id === sourceId);
+            if (sT) await upsertTank(sT);
+            console.log("Carga de nodriza sincronizada");
+          } catch (err) {
+            console.error("Error cargando nodriza:", err);
+          }
+        }} onPackagingRun={async (lot) => {
+          const lotToSave: PackagingLot = { ...lot, almazaraId: currentUser?.almazaraId || 'private', campaign: appConfig.currentCampaign };
+          setPackagingLots([...packagingLots, lotToSave]);
+
+          let updatedTanksState = tanks;
           if (lot.sourceTankId) {
             const tank = tanks.find(t => t.id === lot.sourceTankId);
-            setTanks(tanks.map(t => t.id === lot.sourceTankId ? { ...t, currentKg: t.currentKg - lot.kgUsed } : t));
-            const newMovement = { id: `MOV-PACK-SF-${Date.now()}`, almazaraId: 'private', date: lot.date, source_tank_id: lot.sourceTankId, target_tank_id: 998, kg: lot.kgUsed, variety: tank?.variety_id || 'Mezcla', operator: OWNER_NAME, batch_id: lot.id, campaign: appConfig.currentCampaign };
+            updatedTanksState = tanks.map(t => t.id === lot.sourceTankId ? { ...t, currentKg: t.currentKg - lot.kgUsed } : t);
+            setTanks(updatedTanksState);
+            const newMovement: OilMovement = { id: `MOV-PACK-SF-${Date.now()}`, almazaraId: currentUser?.almazaraId || 'private', date: lot.date, source_tank_id: lot.sourceTankId, target_tank_id: 998, kg: lot.kgUsed, variety: tank?.variety_id || 'Mezcla', operator: currentUser?.fullName || OWNER_NAME, batch_id: lot.id, campaign: appConfig.currentCampaign };
             setOilMovements(prev => [...prev, newMovement]);
+            try {
+              await upsertOilMovement(newMovement);
+              const sT = updatedTanksState.find(t => t.id === lot.sourceTankId);
+              if (sT) await upsertTank(sT);
+            } catch (err) { console.error("Error en movimiento de envasado:", err); }
           } else {
             setNurseTank({ ...nurseTank, currentKg: nurseTank.currentKg - lot.kgUsed });
           }
+
           const existing = finishedProducts.find(p => p.lotId === lot.id);
           if (existing) {
             setFinishedProducts(finishedProducts.map(p => p.lotId === lot.id ? { ...p, unitsAvailable: p.unitsAvailable + lot.units } : p));
           } else {
-            setFinishedProducts([...finishedProducts, { id: `FP-${lot.id}`, almazaraId: 'private', lotId: lot.id, format: lot.format, type: lot.type, unitsAvailable: lot.units }]);
+            setFinishedProducts([...finishedProducts, { id: `FP-${lot.id}`, almazaraId: currentUser?.almazaraId || 'private', lotId: lot.id, format: lot.format, type: lot.type, unitsAvailable: lot.units }]);
           }
-        }} onViewBatch={(batchId) => { setTraceSearchTerm(batchId); setActiveTab('traceability'); }} />;
+
+          try {
+            await upsertPackagingLot(lotToSave);
+            console.log("Lote de envasado sincronizado");
+          } catch (err) {
+            console.error("Error sincronizando envasado:", err);
+          }
+        }}
+        onViewBatch={(batchId) => { setTraceSearchTerm(batchId); setActiveTab('traceability'); }} />;
 
 
-      case 'auxiliary': return <AuxiliaryWarehouse entries={fAuxEntries} stockData={auxStock} availableProducts={appConfig.auxiliaryProducts || []} onAddEntry={(entry) => setAuxEntries([...auxEntries, { ...entry, campaign: appConfig.currentCampaign }])} />;
+      case 'auxiliary': return <AuxiliaryWarehouse entries={fAuxEntries} stockData={auxStock} availableProducts={appConfig.auxiliaryProducts || []} onAddEntry={async (entry) => {
+        const entryToSave: AuxEntry = { ...entry, almazaraId: currentUser?.almazaraId || 'private', campaign: appConfig.currentCampaign };
+        setAuxEntries([...auxEntries, entryToSave]);
+        try {
+          await upsertAuxEntry(entryToSave);
+          console.log("Entrada auxiliar sincronizada");
+        } catch (err) {
+          console.error("Error sincronizando almacén:", err);
+        }
+      }} />;
       case 'direct_sales': return <DirectSalesDashboard vales={fVales} customers={customers} producers={producers} onViewVale={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onViewProducer={setSelectedProducer} onViewCustomer={setSelectedCustomer} />;
       case 'traceability': return <TraceabilityDashboard initialSearch={traceSearchTerm} packagingLots={fPackLots} millingLots={fMilling} vales={fVales} producers={producers} salesOrders={fSales} customers={customers} tanks={tanks} appConfig={appConfig} oilMovements={fMovements} oilExits={fExits} productionLots={fProdLots} onViewValeDetails={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onViewProductionLot={(lpId) => { setExternalOpenProductionLotId(lpId); setActiveTab('milling'); }} onNavigateToTank={(tankId) => { setExternalOpenTankId(tankId); setActiveTab('cellar'); }} />;
       case 'config': return <SettingsDashboard config={appConfig} currentUser={currentUser} onUpdateConfig={setAppConfig} vales={fVales} salesOrders={fSales} oilExits={fExits} producers={producers} customers={customers} tanks={tanks} hoppers={hoppers} millingLots={fMilling} productionLots={fProdLots} oilMovements={fMovements} nurseTank={nurseTank} onUpdateInfrastructure={(nt, nh, ut, nc) => { if (ut) setTanks(ut); if (nc) setNurseTank(p => ({ ...p, maxCapacityKg: nc })); setHoppers(prev => { if (nh === prev.length) return prev; if (nh > prev.length) { const newHoppers = Array.from({ length: nh - prev.length }, (_, i) => ({ id: prev.length + i + 1, almazaraId: 'private', name: `Tolva ${prev.length + i + 1}`, isActive: false, currentUse: 1 })); return [...prev, ...newHoppers]; } else { return prev.slice(0, nh); } }); }} onArchiveCampaign={handleCloseCampaign} onStartCampaign={handleStartCampaign} pastCampaigns={appConfig.pastCampaigns} />;
