@@ -168,10 +168,14 @@ const App: React.FC = () => {
     });
   };
 
-  const [tanks, setTanks] = useState<Tank[]>(() => getPersistedState('app_tanks', Array.from({ length: 12 }, (_, i) => ({
-    id: i + 1, almazaraId: 'unknown', name: `D.${(i + 1).toString().padStart(2, '0')}`,
-    maxCapacityKg: 50000, currentKg: 0, variety_id: undefined, cycleCount: 1, status: 'FILLING' as const
-  }))));
+  const [tanks, setTanks] = useState<Tank[]>(() => {
+    const saved = getPersistedState<Tank[]>('app_tanks', []);
+    if (saved && saved.length > 0) return saved;
+    return Array.from({ length: 12 }, (_, i) => ({
+      id: i + 1, almazaraId: 'unknown', name: `D.${(i + 1).toString().padStart(2, '0')}`,
+      maxCapacityKg: 50000, currentKg: 0, variety_id: undefined, cycleCount: 1, status: 'FILLING' as const
+    }));
+  });
 
   const [nurseTank, setNurseTank] = useState<NurseTank>(() => getPersistedState('app_nurseTank', {
     almazaraId: 'unknown', maxCapacityKg: 10000, currentKg: 0, lastEntryDate: null, lastSourceTankId: null, lastEntryId: 0
@@ -191,11 +195,15 @@ const App: React.FC = () => {
   const [packagingLots, setPackagingLots] = useState<PackagingLot[]>(() => getPersistedState('app_packagingLots', []));
   const [finishedProducts, setFinishedProducts] = useState<FinishedProduct[]>(() => getPersistedState('app_finishedProducts', []));
   const [auxEntries, setAuxEntries] = useState<AuxEntry[]>(() => getPersistedState('app_auxEntries', []));
-  const [hoppers, setHoppers] = useState<Hopper[]>(() => getPersistedState('app_hoppers', [
-    { id: 1, almazaraId: 'unknown', name: 'Tolva 1', isActive: false, currentUse: 1 },
-    { id: 2, almazaraId: 'unknown', name: 'Tolva 2', isActive: false, currentUse: 1 },
-    { id: 3, almazaraId: 'unknown', name: 'Tolva 3', isActive: false, currentUse: 1 }
-  ]));
+  const [hoppers, setHoppers] = useState<Hopper[]>(() => {
+    const saved = getPersistedState<Hopper[]>('app_hoppers', []);
+    if (saved && saved.length > 0) return saved;
+    return [
+      { id: 1, almazaraId: 'unknown', name: 'Tolva 1', isActive: false, currentUse: 1 },
+      { id: 2, almazaraId: 'unknown', name: 'Tolva 2', isActive: false, currentUse: 1 },
+      { id: 3, almazaraId: 'unknown', name: 'Tolva 3', isActive: false, currentUse: 1 }
+    ];
+  });
 
   // Efectos de Persistencia para todos los estados
   useEffect(() => { localStorage.setItem('app_tanks', JSON.stringify(tanks)); }, [tanks]);
@@ -789,7 +797,7 @@ const App: React.FC = () => {
   const MobileIDBadge = () => {
     if (!currentUser?.almazaraId) return null;
     return (
-      <div className="fixed top-2 right-2 md:top-2 md:right-16 bg-[#D9FF66] text-black text-[10px] px-3 py-1.5 rounded-full font-black font-mono z-[9999] border-2 border-black shadow-2xl pointer-events-none">
+      <div className="fixed bottom-2 left-2 bg-[#D9FF66] text-black text-[10px] px-3 py-1.5 rounded-full font-black font-mono z-[99999] border-2 border-black shadow-2xl pointer-events-none">
         ID: {currentUser.almazaraId.substring(0, 6)}
       </div>
     );
