@@ -48,7 +48,10 @@ import {
   fetchSalesOrders,
   fetchPomaceExits,
   fetchAuxEntries,
-  fetchOilExits
+  fetchOilExits,
+  setSyncAlmazaraId,
+  fetchAppConfig,
+  upsertAppConfig
 } from './src/lib/supabaseSync';
 
 const APP_NAME = "ALMAZARA PRIVADA 4.0";
@@ -56,7 +59,7 @@ const CAMPAIGN = "2025/2026";
 const OWNER_NAME = "Administrador";
 
 const DEFAULT_APP_CONFIG: AppConfig = {
-  almazaraId: 'private-user',
+  almazaraId: 'unknown',
   companyName: APP_NAME,
   cif: 'A-00000000',
   address: 'Sede Central',
@@ -105,7 +108,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [appConfig, setAppConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
+  const [appConfig, setAppConfig] = useState<AppConfig>(() => getPersistedState('app_config', DEFAULT_APP_CONFIG));
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar_collapsed');
     return saved === 'true';
@@ -135,12 +138,12 @@ const App: React.FC = () => {
   };
 
   const [tanks, setTanks] = useState<Tank[]>(() => getPersistedState('app_tanks', Array.from({ length: 12 }, (_, i) => ({
-    id: i + 1, almazaraId: 'private', name: `D.${(i + 1).toString().padStart(2, '0')}`,
+    id: i + 1, almazaraId: 'unknown', name: `D.${(i + 1).toString().padStart(2, '0')}`,
     maxCapacityKg: 50000, currentKg: 0, variety_id: undefined, cycleCount: 1, status: 'FILLING' as const
   }))));
 
   const [nurseTank, setNurseTank] = useState<NurseTank>(() => getPersistedState('app_nurseTank', {
-    almazaraId: 'private', maxCapacityKg: 10000, currentKg: 0, lastEntryDate: null, lastSourceTankId: null, lastEntryId: 0
+    almazaraId: 'unknown', maxCapacityKg: 10000, currentKg: 0, lastEntryDate: null, lastSourceTankId: null, lastEntryId: 0
   }));
 
   const [oilMovements, setOilMovements] = useState<OilMovement[]>(() => getPersistedState('app_oilMovements', []));
@@ -158,9 +161,9 @@ const App: React.FC = () => {
   const [finishedProducts, setFinishedProducts] = useState<FinishedProduct[]>(() => getPersistedState('app_finishedProducts', []));
   const [auxEntries, setAuxEntries] = useState<AuxEntry[]>(() => getPersistedState('app_auxEntries', []));
   const [hoppers, setHoppers] = useState<Hopper[]>(() => getPersistedState('app_hoppers', [
-    { id: 1, almazaraId: 'private', name: 'Tolva 1', isActive: false, currentUse: 1 },
-    { id: 2, almazaraId: 'private', name: 'Tolva 2', isActive: false, currentUse: 1 },
-    { id: 3, almazaraId: 'private', name: 'Tolva 3', isActive: false, currentUse: 1 }
+    { id: 1, almazaraId: 'unknown', name: 'Tolva 1', isActive: false, currentUse: 1 },
+    { id: 2, almazaraId: 'unknown', name: 'Tolva 2', isActive: false, currentUse: 1 },
+    { id: 3, almazaraId: 'unknown', name: 'Tolva 3', isActive: false, currentUse: 1 }
   ]));
 
   // Efectos de Persistencia para todos los estados
@@ -180,6 +183,7 @@ const App: React.FC = () => {
   useEffect(() => { localStorage.setItem('app_finishedProducts', JSON.stringify(finishedProducts)); }, [finishedProducts]);
   useEffect(() => { localStorage.setItem('app_auxEntries', JSON.stringify(auxEntries)); }, [auxEntries]);
   useEffect(() => { localStorage.setItem('app_hoppers', JSON.stringify(hoppers)); }, [hoppers]);
+  useEffect(() => { localStorage.setItem('app_config', JSON.stringify(appConfig)); }, [appConfig]);
 
   // --- UI NAVIGATION STATE ---
   const [selectedProducer, setSelectedProducer] = useState<Producer | null>(null);
@@ -202,8 +206,32 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = (user: User) => {
+    const uid = user.id;
+    const almazaraId = user.almazaraId || 'private-user';
+
+    setSyncAlmazaraId(almazaraId);
     setCurrentUser(user);
     setIsLoggedIn(true);
+
+    // Cargar configuración de Supabase al loguear
+    const loadRemoteConfig = async () => {
+      try {
+        const remoteConfig = await fetchAppConfig(almazaraId);
+        if (remoteConfig) {
+          console.log("Configuración remota cargada con éxito");
+          setAppConfig({
+            ...remoteConfig,
+            almazaraId // Asegurar que el ID sea correcto
+          });
+        } else {
+          console.log("No se encontró configuración remota, usando local/default.");
+        }
+      } catch (err) {
+        console.error("Error cargando configuración remota:", err);
+      }
+    };
+
+    loadRemoteConfig();
   };
 
   // --- LÓGICA DE CÁLCULO DE TEÓRICOS ---
@@ -223,13 +251,13 @@ const App: React.FC = () => {
     const stockMap: Record<string, AuxStock> = {};
     if (appConfig.auxiliaryProducts) {
       appConfig.auxiliaryProducts.forEach(prod => {
-        stockMap[prod.name] = { type: prod.name, category: prod.category, almazaraId: 'private', totalIn: 0, totalOut: 0, currentStock: 0 };
+        stockMap[prod.name] = { type: prod.name, category: prod.category, almazaraId: currentUser?.almazaraId || 'unknown', totalIn: 0, totalOut: 0, currentStock: 0 };
       });
     }
     const batchToTypeMap: Record<string, string> = {};
     auxEntries.forEach(entry => {
       if (!stockMap[entry.materialType]) {
-        stockMap[entry.materialType] = { type: entry.materialType, category: 'Otro', almazaraId: 'private', totalIn: 0, totalOut: 0, currentStock: 0 };
+        stockMap[entry.materialType] = { type: entry.materialType, category: 'Otro', almazaraId: currentUser?.almazaraId || 'unknown', totalIn: 0, totalOut: 0, currentStock: 0 };
       }
       stockMap[entry.materialType].totalIn += entry.quantity;
       if (entry.manufacturerBatch && entry.manufacturerBatch !== 'N/A') {
@@ -261,6 +289,13 @@ const App: React.FC = () => {
     });
     return Object.values(stockMap).map(s => ({ ...s, currentStock: s.totalIn - s.totalOut }));
   }, [appConfig.auxiliaryProducts, auxEntries, packagingLots]);
+
+  const handleUpdateConfig = (newConfig: AppConfig) => {
+    setAppConfig(newConfig);
+    upsertAppConfig(newConfig).catch(err => {
+      console.error("Error sincronizando configuración:", err);
+    });
+  };
 
   const handleRegisterClick = () => {
     if (activeTab === 'producers') { setEditingProducer(null); setShowProducerForm(true); }
@@ -618,7 +653,7 @@ const App: React.FC = () => {
       case 'auxiliary': return <AuxiliaryWarehouse entries={fAuxEntries} stockData={auxStock} availableProducts={appConfig.auxiliaryProducts || []} onAddEntry={async (entry) => { const entryToSave: AuxEntry = { ...entry, almazaraId: currentUser?.almazaraId || 'private', campaign: appConfig.currentCampaign }; setAuxEntries([...auxEntries, entryToSave]); try { await upsertAuxEntry(entryToSave); } catch (err) { console.error(err); } }} />;
       case 'direct_sales': return <DirectSalesDashboard vales={fVales} customers={customers} producers={producers} onViewVale={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onViewProducer={setSelectedProducer} onViewCustomer={setSelectedCustomer} />;
       case 'traceability': return <TraceabilityDashboard initialSearch={traceSearchTerm} packagingLots={fPackLots} millingLots={fMilling} vales={fVales} producers={producers} salesOrders={fSales} customers={customers} tanks={tanks} appConfig={appConfig} oilMovements={fMovements} oilExits={fExits} productionLots={fProdLots} onViewValeDetails={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onViewProductionLot={(lpId) => { setExternalOpenProductionLotId(lpId); setActiveTab('milling'); }} onNavigateToTank={(tankId) => { setExternalOpenTankId(tankId); setActiveTab('cellar'); }} />;
-      case 'config': return <SettingsDashboard config={appConfig} currentUser={currentUser} onUpdateConfig={setAppConfig} vales={fVales} salesOrders={fSales} oilExits={fExits} producers={producers} customers={customers} tanks={tanks} hoppers={hoppers} millingLots={fMilling} productionLots={fProdLots} oilMovements={fMovements} nurseTank={nurseTank} onUpdateInfrastructure={(nt, nh, ut, nc) => { if (ut) setTanks(ut); if (nc) setNurseTank(p => ({ ...p, maxCapacityKg: nc })); setHoppers(prev => { if (nh <= prev.length) return prev.slice(0, nh); return [...prev, ...Array.from({ length: nh - prev.length }, (_, i) => ({ id: prev.length + i + 1, almazaraId: 'private', name: `Tolva ${prev.length + i + 1}`, isActive: false, currentUse: 1 }))]; }); }} onArchiveCampaign={handleCloseCampaign} onStartCampaign={handleStartCampaign} pastCampaigns={appConfig.pastCampaigns} />;
+      case 'config': return <SettingsDashboard config={appConfig} currentUser={currentUser} onUpdateConfig={handleUpdateConfig} vales={fVales} salesOrders={fSales} oilExits={fExits} producers={producers} customers={customers} tanks={tanks} hoppers={hoppers} millingLots={fMilling} productionLots={fProdLots} oilMovements={fMovements} nurseTank={nurseTank} onUpdateInfrastructure={(nt, nh, ut, nc) => { if (ut) setTanks(ut); if (nc) setNurseTank(p => ({ ...p, maxCapacityKg: nc })); setHoppers(prev => { if (nh <= prev.length) return prev.slice(0, nh); return [...prev, ...Array.from({ length: nh - prev.length }, (_, i) => ({ id: prev.length + i + 1, almazaraId: currentUser?.almazaraId || 'unknown', name: `Tolva ${prev.length + i + 1}`, isActive: false, currentUse: 1 }))]; }); }} onArchiveCampaign={handleCloseCampaign} onStartCampaign={handleStartCampaign} pastCampaigns={appConfig.pastCampaigns} />;
       default: return null;
     }
   };
@@ -626,7 +661,7 @@ const App: React.FC = () => {
   if (isAuthChecking) return <div className="min-h-screen bg-[#F4F7F4] flex items-center justify-center font-bold text-gray-400">Cargando sistema...</div>;
 
   if (!isLoggedIn) {
-    return <AuthScreen onLogin={handleLogin} authorizedUsers={appConfig.authorizedUsers} />;
+    return <AuthScreen onLogin={handleLogin} authorizedUsers={appConfig.authorizedUsers} almazaraId={appConfig.almazaraId} />;
   }
 
   return (

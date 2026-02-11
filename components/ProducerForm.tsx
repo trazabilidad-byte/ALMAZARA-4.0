@@ -25,7 +25,7 @@ export const ProducerForm: React.FC<ProducerFormProps> = ({ onSave, onCancel, in
     if (formData.name && formData.nif) {
       onSave({
         id: initialData?.id || Date.now().toString(),
-        almazaraId: initialData?.almazaraId || 'private',
+        almazaraId: initialData?.almazaraId || 'unknown',
         name: formData.name,
         nif: formData.nif,
         municipality: formData.municipality || '',
@@ -63,47 +63,47 @@ export const ProducerForm: React.FC<ProducerFormProps> = ({ onSave, onCancel, in
           {/* Datos Identificativos */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
-               <label className={labelClasses}>Razón Social / Nombre Completo</label>
-               <div className="relative">
-                 <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                 <input
-                   type="text"
-                   required
-                   placeholder="Ej: Agrícola Hermanos Pérez S.L."
-                   value={formData.name}
-                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                   className={`${inputClasses} pl-12 text-lg`}
-                 />
-               </div>
+              <label className={labelClasses}>Razón Social / Nombre Completo</label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Agrícola Hermanos Pérez S.L."
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className={`${inputClasses} pl-12 text-lg`}
+                />
+              </div>
             </div>
 
             <div>
-               <label className={labelClasses}>NIF / CIF</label>
-               <div className="relative">
-                 <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                 <input
-                   type="text"
-                   required
-                   placeholder="B-12345678"
-                   value={formData.nif}
-                   onChange={(e) => setFormData({...formData, nif: e.target.value.toUpperCase()})}
-                   className={`${inputClasses} pl-12`}
-                 />
-               </div>
+              <label className={labelClasses}>NIF / CIF</label>
+              <div className="relative">
+                <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                <input
+                  type="text"
+                  required
+                  placeholder="B-12345678"
+                  value={formData.nif}
+                  onChange={(e) => setFormData({ ...formData, nif: e.target.value.toUpperCase() })}
+                  className={`${inputClasses} pl-12`}
+                />
+              </div>
             </div>
 
             <div>
-               <label className={labelClasses}>Teléfono de Contacto</label>
-               <div className="relative">
-                 <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                 <input
-                   type="tel"
-                   placeholder="600 000 000"
-                   value={formData.phone}
-                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                   className={`${inputClasses} pl-12`}
-                 />
-               </div>
+              <label className={labelClasses}>Teléfono de Contacto</label>
+              <div className="relative">
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                <input
+                  type="tel"
+                  placeholder="600 000 000"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className={`${inputClasses} pl-12`}
+                />
+              </div>
             </div>
           </div>
 
@@ -112,63 +112,63 @@ export const ProducerForm: React.FC<ProducerFormProps> = ({ onSave, onCancel, in
             <h3 className="text-xs font-black text-[#111111] uppercase tracking-widest flex items-center gap-2">
               <MapPin size={14} /> Datos de Localización
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="md:col-span-3">
-                 <label className={labelClasses}>Dirección Postal</label>
-                 <input
-                   type="text"
-                   placeholder="C/ Mayor, 45"
-                   value={formData.address}
-                   onChange={(e) => setFormData({...formData, address: e.target.value})}
-                   className={inputClasses}
-                 />
+                <label className={labelClasses}>Dirección Postal</label>
+                <input
+                  type="text"
+                  placeholder="C/ Mayor, 45"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className={inputClasses}
+                />
               </div>
               <div>
-                 <label className={labelClasses}>Municipio</label>
-                 <input
-                   type="text"
-                   placeholder="Úbeda"
-                   value={formData.municipality}
-                   onChange={(e) => setFormData({...formData, municipality: e.target.value})}
-                   className={inputClasses}
-                 />
+                <label className={labelClasses}>Municipio</label>
+                <input
+                  type="text"
+                  placeholder="Úbeda"
+                  value={formData.municipality}
+                  onChange={(e) => setFormData({ ...formData, municipality: e.target.value })}
+                  className={inputClasses}
+                />
               </div>
               <div>
-                 <label className={labelClasses}>Provincia</label>
-                 <input
-                   type="text"
-                   placeholder="Jaén"
-                   value={formData.province}
-                   onChange={(e) => setFormData({...formData, province: e.target.value})}
-                   className={inputClasses}
-                 />
+                <label className={labelClasses}>Provincia</label>
+                <input
+                  type="text"
+                  placeholder="Jaén"
+                  value={formData.province}
+                  onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+                  className={inputClasses}
+                />
               </div>
               <div>
-                 <label className={labelClasses}>C. Postal</label>
-                 <input
-                   type="text"
-                   placeholder="23400"
-                   value={formData.zipCode}
-                   onChange={(e) => setFormData({...formData, zipCode: e.target.value})}
-                   className={inputClasses}
-                 />
+                <label className={labelClasses}>C. Postal</label>
+                <input
+                  type="text"
+                  placeholder="23400"
+                  value={formData.zipCode}
+                  onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+                  className={inputClasses}
+                />
               </div>
             </div>
           </div>
 
           <div>
-             <label className={labelClasses}>Correo Electrónico (Para notificaciones)</label>
-             <div className="relative">
-               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-               <input
-                 type="email"
-                 placeholder="contacto@ejemplo.com"
-                 value={formData.email}
-                 onChange={(e) => setFormData({...formData, email: e.target.value})}
-                 className={`${inputClasses} pl-12`}
-               />
-             </div>
+            <label className={labelClasses}>Correo Electrónico (Para notificaciones)</label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+              <input
+                type="email"
+                placeholder="contacto@ejemplo.com"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className={`${inputClasses} pl-12`}
+              />
+            </div>
           </div>
         </div>
 

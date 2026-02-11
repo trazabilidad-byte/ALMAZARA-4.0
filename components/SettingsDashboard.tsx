@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { AppConfig, PackagingFormatDefinition, Vale, Producer, MillingLot, Tank, Customer, Hopper, NurseTank, AuxProductDefinition, AuthorizedUser, UserRole, SalesOrder, OilExit, ExitType, OliveVariety, ProductionLot, OilMovement } from '../types';
-import { Save, Layout, Beaker, Upload, Settings, Trash2, Plus, Database, Menu, LayoutDashboard, Eye, EyeOff, Scale, Package, Layers, Users, Shield, Archive, AlertOctagon, History, Download, X, Check, ArrowRight, FileSpreadsheet, Lock, Percent, MapPin, Phone, Mail, ChevronDown } from 'lucide-react';
+import { Save, Layout, Beaker, Upload, Settings, Trash2, Plus, Database, Menu, LayoutDashboard, Eye, EyeOff, Scale, Package, Layers, Users, User, Shield, Archive, AlertOctagon, History, Download, X, Check, ArrowRight, FileSpreadsheet, Lock, Percent, MapPin, Phone, Mail, ChevronDown } from 'lucide-react';
 import { NAV_ITEMS } from '../constants';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -778,6 +778,36 @@ export const SettingsDashboard: React.FC<SettingsDashboardProps> = ({
                             <p className="text-gray-400 text-sm">Gestiona quién tiene permiso para acceder a la aplicación.</p>
                         </div>
 
+                        {/* DIAGNÓSTICO MULTI-TENANCY */}
+                        <div className="bg-orange-50 border border-orange-200 p-6 rounded-[24px]">
+                            <h3 className="text-sm font-black text-orange-800 uppercase flex items-center gap-2 mb-4">
+                                <AlertOctagon size={18} /> Diagnóstico de Conexión (Multi-Tenancy)
+                            </h3>
+                            <div className="space-y-4 text-xs font-medium text-orange-900/80 leading-relaxed">
+                                <p>
+                                    Para que varios usuarios compartan la misma configuración y datos, deben tener asignado el mismo <strong>ID de Almazara</strong> en la base de datos.
+                                </p>
+                                <div className="bg-white/50 p-4 rounded-xl border border-orange-100 flex flex-col gap-2">
+                                    <span className="uppercase text-[10px] font-black tracking-widest text-orange-400">Tu ID de Almazara Actual</span>
+                                    <div className="flex items-center gap-2">
+                                        <code className="bg-[#111111] text-[#D9FF66] px-3 py-1.5 rounded-lg font-mono text-sm font-bold select-all">
+                                            {config.almazaraId}
+                                        </code>
+                                        <span className="text-[10px] text-gray-400 italic">(Copia este ID)</span>
+                                    </div>
+                                </div>
+                                <p>
+                                    Si otro usuario no ve tus cambios, ve al <strong>Editor SQL de Supabase</strong> y ejecuta esto para vincularlo:
+                                </p>
+                                <div className="bg-[#111111] text-gray-300 p-4 rounded-xl font-mono text-[10px] overflow-x-auto relative group">
+                                    <pre>
+                                        UPDATE app_users SET almazara_id = '{config.almazaraId}'<br />
+                                        WHERE email = 'CORREO_DEL_OTRO_USUARIO';
+                                    </pre>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Formulario Nuevo Usuario */}
                         <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex items-end gap-4">
                             <div className="flex-1 space-y-1">
@@ -1159,6 +1189,7 @@ export const SettingsDashboard: React.FC<SettingsDashboardProps> = ({
                 )}
 
                 {/* ... (Sección Data y Modal de Archivo sin cambios relevantes) ... */}
+
                 {/* --- 7. EXPORTACIÓN DE DATOS --- */}
                 {activeSection === 'data' && (
                     <div className="max-w-3xl space-y-8 animate-in slide-in-from-right-4 duration-300">

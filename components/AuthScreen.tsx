@@ -6,11 +6,12 @@ import { UserRole, AuthorizedUser } from '../types';
 
 interface AuthScreenProps {
    onLogin: (user: any) => void;
-   onRegister: (companyName: string, email: string) => void;
+   onRegister?: (companyName: string, email: string) => void;
    authorizedUsers: AuthorizedUser[];
+   almazaraId: string;
 }
 
-export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, authorizedUsers }) => {
+export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, authorizedUsers, almazaraId }) => {
    const [email, setEmail] = useState('');
    const [password, setPassword] = useState('');
    const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +34,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, authorizedUsers
                email: localUser.email,
                fullName: localUser.name,
                role: localUser.role,
-               almazaraId: 'private-user'
+               almazaraId: almazaraId
             });
             return;
          }

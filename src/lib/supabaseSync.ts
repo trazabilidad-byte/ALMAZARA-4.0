@@ -3,7 +3,14 @@ import { supabase } from './supabase';
 import { Producer, Vale, MillingLot, AppConfig, Tank, Hopper, UserRole, ProducerStatus, ValeStatus, OliveVariety, Customer, ProductionLot, PackagingLot, OilMovement, SalesOrder, PomaceExit, AuxEntry, CustomerStatus, OilExit } from '../../types';
 import { syncQueue } from './syncQueue';
 
-export const ALMAZARA_ID = import.meta.env.VITE_ALMAZARA_ID || 'private-user';
+export let ALMAZARA_ID = import.meta.env.VITE_ALMAZARA_ID || 'private-user';
+
+export const setSyncAlmazaraId = (id: string) => {
+    if (id && id !== 'unknown' && id !== 'null') {
+        ALMAZARA_ID = id;
+        console.log("SupabaseSync: ID de Almazara actualizado a", id);
+    }
+};
 
 // --- HELPERS PARA SINCRONIZACIÓN ---
 
@@ -21,6 +28,37 @@ const wrapUpsert = async (type: any, payload: any, upsertFn: () => Promise<{ err
         syncQueue.add({ type, payload });
         return { error: err, offline: true };
     }
+};
+
+// --- CONFIGURACIÓN DE LA APP (APP_CONFIGS) ---
+
+export const fetchAppConfig = async (almazaraId?: string): Promise<AppConfig | null> => {
+    const id = almazaraId || ALMAZARA_ID;
+    const { data, error } = await supabase
+        .from('app_configs')
+        .select('config')
+        .eq('almazara_id', id)
+        .single();
+
+    if (error) {
+        if (error.code !== 'PGRST116') { // Ignorar error si no hay registros
+            console.error('Error fetching app config:', error);
+        }
+        return null;
+    }
+
+    return data.config as AppConfig;
+};
+
+export const upsertAppConfig = async (config: AppConfig) => {
+    return wrapUpsert('upsertAppConfig', config, async () => {
+        const { error } = await supabase.from('app_configs').upsert({
+            almazara_id: ALMAZARA_ID,
+            config: config,
+            updated_at: new Date().toISOString()
+        });
+        return { error };
+    });
 };
 
 // --- PRODUCTORES ---
@@ -47,16 +85,17 @@ export const fetchProducers = async (): Promise<Producer[]> => {
 };
 
 export const upsertProducer = async (producer: Producer) => {
-    return wrapUpsert('upsertProducer', producer, () =>
-        supabase.from('producers').upsert({
+    return wrapUpsert('upsertProducer', producer, async () => {
+        const { error } = await supabase.from('producers').upsert({
             id: producer.id,
             almazara_id: ALMAZARA_ID,
             name: producer.name,
             nif: producer.nif,
             total_kg_delivered: producer.totalKgDelivered,
             status: producer.status
-        })
-    );
+        });
+        return { error };
+    });
 };
 
 // --- VALES ---
@@ -96,8 +135,8 @@ export const fetchVales = async (): Promise<Vale[]> => {
 };
 
 export const upsertVale = async (vale: Vale) => {
-    return wrapUpsert('upsertVale', vale, () =>
-        supabase.from('vales').upsert({
+    return wrapUpsert('upsertVale', vale, async () => {
+        const { error } = await supabase.from('vales').upsert({
             id: vale.id,
             almazara_id: ALMAZARA_ID,
             sequential_id: vale.id_vale,
@@ -110,8 +149,9 @@ export const upsertVale = async (vale: Vale) => {
             status: vale.estado as any,
             milling_lot_id: vale.milling_lot_id,
             campaign: vale.campaign
-        })
-    );
+        });
+        return { error };
+    });
 };
 
 // --- TANQUES ---
@@ -139,8 +179,8 @@ export const fetchTanks = async (): Promise<Tank[]> => {
 };
 
 export const upsertTank = async (tank: Tank) => {
-    return wrapUpsert('upsertTank', tank, () =>
-        supabase.from('tanks').upsert({
+    return wrapUpsert('upsertTank', tank, async () => {
+        const { error } = await supabase.from('tanks').upsert({
             id: tank.id,
             almazara_id: ALMAZARA_ID,
             name: tank.name,
@@ -149,8 +189,9 @@ export const upsertTank = async (tank: Tank) => {
             variety_id: tank.variety_id,
             current_batch_id: tank.currentBatchId,
             status: tank.status || 'FILLING'
-        })
-    );
+        });
+        return { error };
+    });
 };
 
 // --- TOLVAS ---
@@ -203,8 +244,8 @@ export const fetchMillingLots = async (): Promise<MillingLot[]> => {
 };
 
 export const upsertMillingLot = async (lot: MillingLot) => {
-    return wrapUpsert('upsertMillingLot', lot, () =>
-        supabase.from('milling_lots').upsert({
+    return wrapUpsert('upsertMillingLot', lot, async () => {
+        const { error } = await supabase.from('milling_lots').upsert({
             id: lot.id,
             almazara_id: ALMAZARA_ID,
             start_date: lot.fecha,
@@ -214,13 +255,14 @@ export const upsertMillingLot = async (lot: MillingLot) => {
             industrial_oil_kg: lot.kilos_aceite_real,
             campaign: lot.campaign,
             status: 'ACTIVE'
-        })
-    );
+        });
+        return { error };
+    });
 };
 
 export const upsertCustomer = async (customer: Customer) => {
-    return wrapUpsert('upsertCustomer', customer, () =>
-        supabase.from('customers').upsert({
+    return wrapUpsert('upsertCustomer', customer, async () => {
+        const { error } = await supabase.from('customers').upsert({
             id: customer.id,
             almazara_id: ALMAZARA_ID,
             name: customer.name,
@@ -230,8 +272,9 @@ export const upsertCustomer = async (customer: Customer) => {
             email: customer.email,
             type: customer.type as any,
             status: customer.status === 'Activo' ? 'ACTIVE' : 'ARCHIVED'
-        })
-    );
+        });
+        return { error };
+    });
 };
 
 // --- CLIENTES ---
@@ -285,8 +328,8 @@ export const fetchProductionLots = async (): Promise<ProductionLot[]> => {
 };
 
 export const upsertProductionLot = async (lot: ProductionLot) => {
-    return wrapUpsert('upsertProductionLot', lot, () =>
-        supabase.from('production_lots').upsert({
+    return wrapUpsert('upsertProductionLot', lot, async () => {
+        const { error } = await supabase.from('production_lots').upsert({
             id: lot.id,
             almazara_id: ALMAZARA_ID,
             date: lot.fecha,
@@ -296,8 +339,9 @@ export const upsertProductionLot = async (lot: ProductionLot) => {
             target_tank_id: lot.targetTankId,
             notes: lot.notes,
             campaign: lot.campaign
-        })
-    );
+        });
+        return { error };
+    });
 };
 
 // --- LOTES DE ENVASADO ---
@@ -331,8 +375,8 @@ export const fetchPackagingLots = async (): Promise<PackagingLot[]> => {
 };
 
 export const upsertPackagingLot = async (lot: PackagingLot) => {
-    return wrapUpsert('upsertPackagingLot', lot, () =>
-        supabase.from('packaging_lots').upsert({
+    return wrapUpsert('upsertPackagingLot', lot, async () => {
+        const { error } = await supabase.from('packaging_lots').upsert({
             id: lot.id,
             almazara_id: ALMAZARA_ID,
             date: lot.date,
@@ -347,8 +391,9 @@ export const upsertPackagingLot = async (lot: PackagingLot) => {
             source_info: lot.sourceInfo,
             source_tank_id: lot.sourceTankId,
             campaign: lot.campaign
-        })
-    );
+        });
+        return { error };
+    });
 };
 
 // --- MOVIMIENTOS Y AJUSTES ---
@@ -379,8 +424,8 @@ export const fetchOilMovements = async (): Promise<OilMovement[]> => {
 };
 
 export const upsertOilMovement = async (mov: OilMovement) => {
-    return wrapUpsert('upsertOilMovement', mov, () =>
-        supabase.from('oil_movements').upsert({
+    return wrapUpsert('upsertOilMovement', mov, async () => {
+        const { error } = await supabase.from('oil_movements').upsert({
             id: mov.id,
             almazara_id: ALMAZARA_ID,
             date: mov.date,
@@ -392,8 +437,9 @@ export const upsertOilMovement = async (mov: OilMovement) => {
             campaign: mov.campaign,
             batch_id: mov.batch_id,
             closure_details: mov.closureDetails
-        })
-    );
+        });
+        return { error };
+    });
 };
 
 // --- PEDIDOS DE VENTA ---
@@ -421,8 +467,8 @@ export const fetchSalesOrders = async (): Promise<SalesOrder[]> => {
 };
 
 export const upsertSalesOrder = async (order: SalesOrder) => {
-    return wrapUpsert('upsertSalesOrder', order, () =>
-        supabase.from('sales_orders').upsert({
+    return wrapUpsert('upsertSalesOrder', order, async () => {
+        const { error } = await supabase.from('sales_orders').upsert({
             id: order.id,
             almazara_id: ALMAZARA_ID,
             date: order.date,
@@ -431,8 +477,9 @@ export const upsertSalesOrder = async (order: SalesOrder) => {
             total_amount: order.totalAmount,
             status: order.status,
             campaign: order.campaign
-        })
-    );
+        });
+        return { error };
+    });
 };
 
 // --- SALIDAS DE ORUJO ---
@@ -460,8 +507,8 @@ export const fetchPomaceExits = async (): Promise<PomaceExit[]> => {
 };
 
 export const upsertPomaceExit = async (exit: PomaceExit) => {
-    return wrapUpsert('upsertPomaceExit', exit, () =>
-        supabase.from('pomace_exits').upsert({
+    return wrapUpsert('upsertPomaceExit', exit, async () => {
+        const { error } = await supabase.from('pomace_exits').upsert({
             id: exit.id,
             almazara_id: ALMAZARA_ID,
             date: exit.date,
@@ -470,8 +517,9 @@ export const upsertPomaceExit = async (exit: PomaceExit) => {
             vale_number: exit.valeNumber,
             notes: exit.notes,
             campaign: exit.campaign
-        })
-    );
+        });
+        return { error };
+    });
 };
 
 // --- ENTRADAS AUXILIARES ---
@@ -500,8 +548,8 @@ export const fetchAuxEntries = async (): Promise<AuxEntry[]> => {
 };
 
 export const upsertAuxEntry = async (entry: AuxEntry) => {
-    return wrapUpsert('upsertAuxEntry', entry, () =>
-        supabase.from('aux_entries').upsert({
+    return wrapUpsert('upsertAuxEntry', entry, async () => {
+        const { error } = await supabase.from('aux_entries').upsert({
             id: entry.id,
             almazara_id: ALMAZARA_ID,
             date: entry.date,
@@ -511,8 +559,9 @@ export const upsertAuxEntry = async (entry: AuxEntry) => {
             manufacturer_batch: entry.manufacturerBatch,
             price_per_unit: entry.pricePerUnit,
             campaign: entry.campaign
-        })
-    );
+        });
+        return { error };
+    });
 };
 
 // --- SALIDAS DE ACEITE (BULK/EXIT) ---
@@ -545,8 +594,8 @@ export const fetchOilExits = async (): Promise<OilExit[]> => {
 };
 
 export const upsertOilExit = async (exit: OilExit) => {
-    return wrapUpsert('upsertOilExit', exit, () =>
-        supabase.from('oil_exits').upsert({
+    return wrapUpsert('upsertOilExit', exit, async () => {
+        const { error } = await supabase.from('oil_exits').upsert({
             id: exit.id,
             almazara_id: ALMAZARA_ID,
             tank_id: exit.tank_id,
@@ -560,6 +609,7 @@ export const upsertOilExit = async (exit: OilExit) => {
             seals: exit.seals,
             campaign: exit.campaign,
             delivery_note: exit.deliveryNote
-        })
-    );
+        });
+        return { error };
+    });
 };

@@ -24,7 +24,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onSave, onCancel, in
     if (formData.name && formData.cif) {
       onSave({
         id: initialData?.id || Date.now().toString(),
-        almazaraId: initialData?.almazaraId || 'private',
+        almazaraId: initialData?.almazaraId || 'unknown',
         name: formData.name,
         cif: formData.cif,
         address: formData.address || '',
@@ -61,94 +61,93 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onSave, onCancel, in
           <div>
             <label className={labelClasses}>Tipo de Cliente</label>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-               {Object.values(CustomerType).map((type) => (
-                 <button
-                   key={type}
-                   type="button"
-                   onClick={() => setFormData({ ...formData, type })}
-                   className={`py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
-                     formData.type === type 
-                       ? 'bg-[#111111] text-[#D9FF66] border-[#111111]' 
-                       : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
-                   }`}
-                 >
-                   {type}
-                 </button>
-               ))}
+              {Object.values(CustomerType).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, type })}
+                  className={`py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${formData.type === type
+                      ? 'bg-[#111111] text-[#D9FF66] border-[#111111]'
+                      : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
+                    }`}
+                >
+                  {type}
+                </button>
+              ))}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
-               <label className={labelClasses}>Razón Social / Nombre</label>
-               <div className="relative">
-                 <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                 <input
-                   type="text"
-                   required
-                   placeholder="Nombre del cliente o empresa"
-                   value={formData.name}
-                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                   className={`${inputClasses} pl-12 text-lg`}
-                 />
-               </div>
+              <label className={labelClasses}>Razón Social / Nombre</label>
+              <div className="relative">
+                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                <input
+                  type="text"
+                  required
+                  placeholder="Nombre del cliente o empresa"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className={`${inputClasses} pl-12 text-lg`}
+                />
+              </div>
             </div>
 
             <div>
-               <label className={labelClasses}>CIF / DNI</label>
-               <div className="relative">
-                 <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                 <input
-                   type="text"
-                   required
-                   placeholder="B-12345678"
-                   value={formData.cif}
-                   onChange={(e) => setFormData({...formData, cif: e.target.value.toUpperCase()})}
-                   className={`${inputClasses} pl-12`}
-                 />
-               </div>
+              <label className={labelClasses}>CIF / DNI</label>
+              <div className="relative">
+                <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                <input
+                  type="text"
+                  required
+                  placeholder="B-12345678"
+                  value={formData.cif}
+                  onChange={(e) => setFormData({ ...formData, cif: e.target.value.toUpperCase() })}
+                  className={`${inputClasses} pl-12`}
+                />
+              </div>
             </div>
 
             <div>
-               <label className={labelClasses}>Teléfono</label>
-               <div className="relative">
-                 <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                 <input
-                   type="tel"
-                   placeholder="600 000 000"
-                   value={formData.phone}
-                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                   className={`${inputClasses} pl-12`}
-                 />
-               </div>
+              <label className={labelClasses}>Teléfono</label>
+              <div className="relative">
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                <input
+                  type="tel"
+                  placeholder="600 000 000"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className={`${inputClasses} pl-12`}
+                />
+              </div>
             </div>
 
             <div className="md:col-span-2">
-               <label className={labelClasses}>Dirección Completa</label>
-               <div className="relative">
-                 <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                 <input
-                   type="text"
-                   placeholder="C/ Ejemplo 123, Ciudad, Provincia"
-                   value={formData.address}
-                   onChange={(e) => setFormData({...formData, address: e.target.value})}
-                   className={`${inputClasses} pl-12`}
-                 />
-               </div>
+              <label className={labelClasses}>Dirección Completa</label>
+              <div className="relative">
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                <input
+                  type="text"
+                  placeholder="C/ Ejemplo 123, Ciudad, Provincia"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className={`${inputClasses} pl-12`}
+                />
+              </div>
             </div>
 
             <div className="md:col-span-2">
-               <label className={labelClasses}>Correo Electrónico</label>
-               <div className="relative">
-                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                 <input
-                   type="email"
-                   placeholder="facturacion@cliente.com"
-                   value={formData.email}
-                   onChange={(e) => setFormData({...formData, email: e.target.value})}
-                   className={`${inputClasses} pl-12`}
-                 />
-               </div>
+              <label className={labelClasses}>Correo Electrónico</label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                <input
+                  type="email"
+                  placeholder="facturacion@cliente.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className={`${inputClasses} pl-12`}
+                />
+              </div>
             </div>
           </div>
         </div>
