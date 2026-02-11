@@ -49,15 +49,18 @@ export const useOfflineSync = () => {
                     } else {
                         console.error(`❌ Error de Supabase en ${op.type}:`, error);
 
-                        // Si es un error de datos (4xx), lo quitamos de la cola porque no se arreglará reintentando
-                        if (error.status >= 400 && error.status < 500) {
+                        // Códigos de error de Supabase/PostgREST
+                        const isAuthError = error.status === 403 || error.code === '42501' || error.status === 401;
+                        const isValidationError = (error.status >= 400 && error.status < 500) && !isAuthError;
+
+                        if (isValidationError) {
                             console.warn("⚠️ Error de validación detectado. Eliminando de la cola para no bloquear.");
                             syncQueue.remove(op.id);
                             setPendingCount(prev => prev - 1);
                             continue;
                         }
 
-                        // Si es un error de red (5xx o similar), paramos la cola para reintentar luego
+                        // Si es error de auth o red, paramos la ejecución de la cola
                         break;
                     }
                 }
