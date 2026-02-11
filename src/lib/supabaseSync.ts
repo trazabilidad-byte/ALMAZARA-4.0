@@ -74,6 +74,8 @@ export const fetchProducers = async (almazaraId?: string): Promise<Producer[]> =
         return [];
     }
 
+    console.log(`Supabase: Encontrados ${data?.length || 0} productores para ${id}`);
+
     return data.map(p => ({
         id: p.id,
         almazaraId: p.almazara_id,

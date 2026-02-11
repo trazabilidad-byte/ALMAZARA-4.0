@@ -159,6 +159,7 @@ const App: React.FC = () => {
     return saved === 'true';
   });
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { isOnline, isSyncing, pendingCount } = useOfflineSync();
 
   const toggleSidebar = () => {
@@ -445,9 +446,10 @@ const App: React.FC = () => {
 
   // --- LÓGICA DE CARGA DESDE SUPABASE ---
   const refreshAllData = async () => {
-    if (!currentUser) return;
+    if (!currentUser || isRefreshing) return;
+    setIsRefreshing(true);
     const activeId = currentUser.almazaraId;
-    console.log("Forzando recarga de datos de Supabase para Almazara:", activeId);
+    console.log("🔄 Recarga manual solicitada para:", activeId);
     setSyncAlmazaraId(activeId);
 
     try {
@@ -468,14 +470,13 @@ const App: React.FC = () => {
         fetchNurseTank(activeId)
       ]);
 
-      // Guardas Inteligentes: Si el servidor retorna datos, los tomamos. 
-      // Para tablas críticas como Tanques/Tolvas, si retorna vacío ignoramos para no borrar el layout local por defecto.
       // --- LÓGICA DE FUSIÓN (MERGE) PARA EVITAR BORRADOS ---
-      const getMergedState = <T extends { id: string } | { id_vale: number }>(serverItems: any[], localItems: any[], opType: string) => {
-        const queueOps = syncQueue.get().filter(op => op.type === opType);
-        const pendingIds = new Set(queueOps.map(op => op.payload.id || op.payload.id_vale));
+      const getMergedState = (serverItems: any[], localItems: any[], opType: string) => {
+        const queue = syncQueue.get();
+        const pendingIds = new Set(queue.filter(op => op.type === opType).map(op => op.payload.id || op.payload.id_vale));
         const pendingLocally = localItems.filter(item => pendingIds.has(item.id || item.id_vale));
         const serverIds = new Set(serverItems.map(item => item.id || item.id_vale));
+        // Mezclamos: Lo del servidor manda, pero lo que tenemos pendiente localmente se mantiene si no está en el servidor
         return [...serverItems, ...pendingLocally.filter(item => !serverIds.has(item.id || item.id_vale))];
       };
 
@@ -500,9 +501,12 @@ const App: React.FC = () => {
       if (oe) setOilExits(prev => getMergedState(oe, prev, 'upsertOilExit'));
       if (nt) setNurseTank(nt);
 
-      console.log("Carga de datos transaccionales completada");
+      console.log("✅ Datos actualizados correctamente");
     } catch (error) {
-      console.error("Error cargando históricos de Supabase:", error);
+      console.error("❌ Error en recarga:", error);
+      alert("Error al sincronizar datos. Comprueba tu conexión.");
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -856,9 +860,21 @@ const App: React.FC = () => {
                   </div>
 
                   {pendingCount > 0 && (
-                    <div className="flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-md bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest animate-pulse">
+                    <div
+                      className="flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-md bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest animate-pulse relative group cursor-help"
+                      title={syncQueue.get().map(op => `${op.type}: ${op.payload.name || op.payload.id}`).join('\n')}
+                    >
                       <RefreshCw size={10} className={isSyncing ? 'animate-spin' : ''} />
                       {pendingCount} Pendientes
+
+                      {/* Tooltip con nombres */}
+                      <div className="absolute top-full mt-2 left-0 bg-black text-white p-2 rounded shadow-xl text-[9px] lowercase opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none border border-white/10">
+                        {syncQueue.get().slice(0, 5).map(op => (
+                          <div key={op.id}>• {op.type.replace('upsert', '')}: {op.payload.name || op.payload.id?.substring(0, 5)}</div>
+                        ))}
+                        {pendingCount > 5 && <div>y {pendingCount - 5} más...</div>}
+                      </div>
+
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -867,7 +883,7 @@ const App: React.FC = () => {
                             window.location.reload();
                           }
                         }}
-                        className="ml-2 hover:bg-white/20 p-0.5 rounded"
+                        className="ml-2 hover:bg-white/20 p-0.5 rounded pointer-events-auto"
                         title="Limpiar cola"
                       >
                         <X size={10} />
@@ -877,11 +893,11 @@ const App: React.FC = () => {
 
                   <button
                     onClick={() => refreshAllData()}
-                    className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white hover:bg-gray-100 text-black text-[10px] font-black uppercase tracking-widest border border-black/10 transition-all shadow-sm"
-                    title="Recargar datos de la nube"
+                    className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white hover:bg-gray-100 text-black text-[10px] font-black uppercase tracking-widest border border-black/10 transition-all shadow-sm active:scale-95"
+                    disabled={isRefreshing}
                   >
-                    <RefreshCw size={10} className={isSyncing ? 'animate-spin' : ''} />
-                    Sincronizar
+                    <RefreshCw size={10} className={isRefreshing ? 'animate-spin' : ''} />
+                    {isRefreshing ? 'Sincronizando...' : 'Sincronizar'}
                   </button>
                 </div>
                 <h1 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tighter text-[#111111] uppercase">
