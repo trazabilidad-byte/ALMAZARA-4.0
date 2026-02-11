@@ -233,7 +233,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // NUCLEAR OPTION: Limpieza forzada de caché al subir versión
-    const SYS_VERSION = '4.1';
+    const SYS_VERSION = '4.2';
     const storedVersion = localStorage.getItem('sys_version');
 
     if (storedVersion !== SYS_VERSION) {
