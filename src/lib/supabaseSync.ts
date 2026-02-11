@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { Producer, Vale, MillingLot, AppConfig, Tank, Hopper, UserRole, ProducerStatus, ValeStatus, OliveVariety, Customer, ProductionLot, PackagingLot, OilMovement, SalesOrder, PomaceExit, AuxEntry, CustomerStatus, OilExit } from '../../types';
+import { Producer, Vale, MillingLot, AppConfig, Tank, Hopper, UserRole, ProducerStatus, ValeStatus, OliveVariety, Customer, ProductionLot, PackagingLot, OilMovement, SalesOrder, PomaceExit, AuxEntry, CustomerStatus, OilExit, NurseTank } from '../../types';
 import { syncQueue } from './syncQueue';
 
 export let ALMAZARA_ID = import.meta.env.VITE_ALMAZARA_ID || 'private-user';
@@ -194,6 +194,13 @@ export const upsertTank = async (tank: Tank) => {
     });
 };
 
+export const deleteTank = async (id: number) => {
+    return wrapUpsert('deleteTank', { id }, async () => {
+        const { error } = await supabase.from('tanks').delete().eq('id', id).eq('almazara_id', ALMAZARA_ID);
+        return { error };
+    });
+};
+
 // --- TOLVAS ---
 export const fetchHoppers = async (): Promise<Hopper[]> => {
     const { data, error } = await supabase
@@ -213,6 +220,64 @@ export const fetchHoppers = async (): Promise<Hopper[]> => {
         isActive: h.is_active,
         currentUse: 1
     }));
+};
+
+export const upsertHopper = async (hopper: Hopper) => {
+    return wrapUpsert('upsertHopper', hopper, async () => {
+        const { error } = await supabase.from('hoppers').upsert({
+            id: hopper.id,
+            almazara_id: ALMAZARA_ID,
+            name: hopper.name,
+            is_active: hopper.isActive
+        });
+        return { error };
+    });
+};
+
+export const deleteHopper = async (id: number) => {
+    return wrapUpsert('deleteHopper', { id }, async () => {
+        const { error } = await supabase.from('hoppers').delete().eq('id', id).eq('almazara_id', ALMAZARA_ID);
+        return { error };
+    });
+};
+
+// --- NODRIZA (NURSE TANK) ---
+export const fetchNurseTank = async (): Promise<NurseTank | null> => {
+    const { data, error } = await supabase
+        .from('nurse_tanks')
+        .select('*')
+        .eq('almazara_id', ALMAZARA_ID)
+        .maybeSingle(); // Usamos maybeSingle para evitar error si no existe
+
+    if (error) {
+        console.error('Error fetching nurse tank:', error);
+        return null;
+    }
+
+    if (!data) return null;
+
+    return {
+        almazaraId: data.almazara_id,
+        maxCapacityKg: Number(data.max_capacity_kg),
+        currentKg: Number(data.current_kg),
+        lastEntryDate: data.last_entry_date,
+        lastSourceTankId: data.last_source_tank_id,
+        lastEntryId: 0
+    };
+};
+
+export const upsertNurseTank = async (nurseTank: NurseTank) => {
+    return wrapUpsert('upsertNurseTank', nurseTank, async () => {
+        // Asumimos que la tabla nurse_tanks tiene almazara_id como Primary Key o Unique
+        const { error } = await supabase.from('nurse_tanks').upsert({
+            almazara_id: ALMAZARA_ID,
+            max_capacity_kg: nurseTank.maxCapacityKg,
+            current_kg: nurseTank.currentKg,
+            last_entry_date: nurseTank.lastEntryDate,
+            last_source_tank_id: nurseTank.lastSourceTankId
+        }, { onConflict: 'almazara_id' });
+        return { error };
+    });
 };
 
 // --- LOTES DE MOLTURACIÓN ---

@@ -51,7 +51,12 @@ import {
   fetchOilExits,
   setSyncAlmazaraId,
   fetchAppConfig,
-  upsertAppConfig
+  upsertAppConfig,
+  deleteTank,
+  deleteHopper,
+  fetchNurseTank,
+  upsertNurseTank,
+  upsertHopper
 } from './src/lib/supabaseSync';
 
 const APP_NAME = "ALMAZARA PRIVADA 4.0";
@@ -417,7 +422,7 @@ const App: React.FC = () => {
 
       const loadData = async () => {
         try {
-          const [p, v, t, h, m, c, pl, pk, om, so, pe, ae, oe] = await Promise.all([
+          const [p, v, t, h, m, c, pl, pk, om, so, pe, ae, oe, nt] = await Promise.all([
             fetchProducers(),
             fetchVales(),
             fetchTanks(),
@@ -430,7 +435,8 @@ const App: React.FC = () => {
             fetchSalesOrders(),
             fetchPomaceExits(),
             fetchAuxEntries(),
-            fetchOilExits()
+            fetchOilExits(),
+            fetchNurseTank()
           ]);
 
           if (p.length > 0) setProducers(p);
@@ -446,6 +452,7 @@ const App: React.FC = () => {
           if (pe.length > 0) setPomaceExits(pe);
           if (ae.length > 0) setAuxEntries(ae);
           if (oe.length > 0) setOilExits(oe);
+          if (nt) setNurseTank(nt); // Set Nurse Tank if found
 
           console.log("Carga de datos transaccionales completada");
         } catch (error) {
@@ -679,7 +686,54 @@ const App: React.FC = () => {
       case 'auxiliary': return <AuxiliaryWarehouse entries={fAuxEntries} stockData={auxStock} availableProducts={appConfig.auxiliaryProducts || []} onAddEntry={async (entry) => { const entryToSave: AuxEntry = { ...entry, almazaraId: currentUser?.almazaraId || 'private', campaign: appConfig.currentCampaign }; setAuxEntries([...auxEntries, entryToSave]); try { await upsertAuxEntry(entryToSave); } catch (err) { console.error(err); } }} />;
       case 'direct_sales': return <DirectSalesDashboard vales={fVales} customers={customers} producers={producers} onViewVale={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onViewProducer={setSelectedProducer} onViewCustomer={setSelectedCustomer} />;
       case 'traceability': return <TraceabilityDashboard initialSearch={traceSearchTerm} packagingLots={fPackLots} millingLots={fMilling} vales={fVales} producers={producers} salesOrders={fSales} customers={customers} tanks={tanks} appConfig={appConfig} oilMovements={fMovements} oilExits={fExits} productionLots={fProdLots} onViewValeDetails={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onViewProductionLot={(lpId) => { setExternalOpenProductionLotId(lpId); setActiveTab('milling'); }} onNavigateToTank={(tankId) => { setExternalOpenTankId(tankId); setActiveTab('cellar'); }} />;
-      case 'config': return <SettingsDashboard config={appConfig} currentUser={currentUser} onUpdateConfig={handleUpdateConfig} vales={fVales} salesOrders={fSales} oilExits={fExits} producers={producers} customers={customers} tanks={tanks} hoppers={hoppers} millingLots={fMilling} productionLots={fProdLots} oilMovements={fMovements} nurseTank={nurseTank} onUpdateInfrastructure={(nt, nh, ut, nc) => { if (ut) setTanks(ut); if (nc) setNurseTank(p => ({ ...p, maxCapacityKg: nc })); setHoppers(prev => { if (nh <= prev.length) return prev.slice(0, nh); return [...prev, ...Array.from({ length: nh - prev.length }, (_, i) => ({ id: prev.length + i + 1, almazaraId: currentUser?.almazaraId || 'unknown', name: `Tolva ${prev.length + i + 1}`, isActive: false, currentUse: 1 }))]; }); }} onArchiveCampaign={handleCloseCampaign} onStartCampaign={handleStartCampaign} pastCampaigns={appConfig.pastCampaigns} />;
+      case 'config': return <SettingsDashboard config={appConfig} currentUser={currentUser} onUpdateConfig={handleUpdateConfig} vales={fVales} salesOrders={fSales} oilExits={fExits} producers={producers} customers={customers} tanks={tanks} hoppers={hoppers} millingLots={fMilling} productionLots={fProdLots} oilMovements={fMovements} nurseTank={nurseTank} onUpdateInfrastructure={(nt, nh, ut, nc) => {
+        // 1. Sincronización de Tanques
+        if (ut) {
+          // Detectar eliminados
+          const newIds = new Set(ut.map(t => t.id));
+          tanks.forEach(t => {
+            if (!newIds.has(t.id)) deleteTank(t.id).catch(console.error);
+          });
+          // Upsert de los actuales
+          ut.forEach(t => upsertTank(t).catch(console.error));
+          setTanks(ut);
+        }
+
+        // 2. Sincronización de Nodriza
+        if (nc !== undefined) {
+          setNurseTank(prev => {
+            const newNt = { ...prev, maxCapacityKg: nc };
+            upsertNurseTank(newNt).catch(console.error);
+            return newNt;
+          });
+        }
+
+        // 3. Sincronización de Tolvas
+        setHoppers(prev => {
+          let newHoppers = [...prev];
+          if (nh < prev.length) {
+            // Borrar sobrantes
+            const toDelete = prev.slice(nh);
+            toDelete.forEach(h => deleteHopper(h.id).catch(console.error));
+            newHoppers = prev.slice(0, nh);
+          } else if (nh > prev.length) {
+            // Añadir nuevas
+            const added = Array.from({ length: nh - prev.length }, (_, i) => ({
+              id: prev.length + i + 1,
+              almazaraId: currentUser?.almazaraId || 'unknown',
+              name: `Tolva ${prev.length + i + 1}`,
+              isActive: false,
+              currentUse: 1
+            }));
+            // Guardar nuevas en Supabase
+            added.forEach(h => upsertHopper(h).catch(console.error)); // Necesitaríamos upsertHopper en supabaseSync
+            newHoppers = [...prev, ...added];
+          }
+          // Sincronizar estado (aunque tolvas solo tienen active/inactive que se maneja en otro lado,
+          // aquí solo manejamos cantidad. Pero al crear nuevas hay que guardarlas).
+          return newHoppers;
+        });
+      }} onArchiveCampaign={handleCloseCampaign} onStartCampaign={handleStartCampaign} pastCampaigns={appConfig.pastCampaigns} />;
       default: return null;
     }
   };
