@@ -437,42 +437,43 @@ const App: React.FC = () => {
   // --- LÓGICA DE CARGA DESDE SUPABASE ---
   useEffect(() => {
     if (isLoggedIn && currentUser) {
-      console.log("Cargando datos reales de Supabase para Almazara:", currentUser.almazaraId);
-      setSyncAlmazaraId(currentUser.almazaraId);
+      const activeId = currentUser.almazaraId;
+      console.log("Cargando datos reales de Supabase para Almazara:", activeId);
+      setSyncAlmazaraId(activeId);
 
       const loadData = async () => {
         try {
           const [p, v, t, h, m, c, pl, pk, om, so, pe, ae, oe, nt] = await Promise.all([
-            fetchProducers(),
-            fetchVales(),
-            fetchTanks(),
-            fetchHoppers(),
-            fetchMillingLots(),
-            fetchCustomers(),
-            fetchProductionLots(),
-            fetchPackagingLots(),
-            fetchOilMovements(),
-            fetchSalesOrders(),
-            fetchPomaceExits(),
-            fetchAuxEntries(),
-            fetchOilExits(),
-            fetchNurseTank()
+            fetchProducers(activeId),
+            fetchVales(activeId),
+            fetchTanks(activeId),
+            fetchHoppers(activeId),
+            fetchMillingLots(activeId),
+            fetchCustomers(activeId),
+            fetchProductionLots(activeId),
+            fetchPackagingLots(activeId),
+            fetchOilMovements(activeId),
+            fetchSalesOrders(activeId),
+            fetchPomaceExits(activeId),
+            fetchAuxEntries(activeId),
+            fetchOilExits(activeId),
+            fetchNurseTank(activeId)
           ]);
 
-          if (p.length > 0) setProducers(p);
-          if (v.length > 0) setVales(v);
-          if (t.length > 0) setTanks(t);
-          if (h.length > 0) setHoppers(h);
-          if (m.length > 0) setMillingLots(m);
-          if (c.length > 0) setCustomers(c);
-          if (pl.length > 0) setProductionLots(pl);
-          if (pk.length > 0) setPackagingLots(pk);
-          if (om.length > 0) setOilMovements(om);
-          if (so.length > 0) setSalesOrders(so);
-          if (pe.length > 0) setPomaceExits(pe);
-          if (ae.length > 0) setAuxEntries(ae);
-          if (oe.length > 0) setOilExits(oe);
-          if (nt) setNurseTank(nt); // Set Nurse Tank if found
+          if (p) setProducers(p);
+          if (v) setVales(v);
+          if (t) setTanks(t);
+          if (h) setHoppers(h);
+          if (m) setMillingLots(m);
+          if (c) setCustomers(c);
+          if (pl) setProductionLots(pl);
+          if (pk) setPackagingLots(pk);
+          if (om) setOilMovements(om);
+          if (so) setSalesOrders(so);
+          if (pe) setPomaceExits(pe);
+          if (ae) setAuxEntries(ae);
+          if (oe) setOilExits(oe);
+          if (nt) setNurseTank(nt);
 
           console.log("Carga de datos transaccionales completada");
         } catch (error) {
@@ -784,6 +785,16 @@ const App: React.FC = () => {
     }
   };
 
+  // --- LÓGICA DE ID VISIBLE (SOLUCIÓN DEFINITIVA) ---
+  const MobileIDBadge = () => {
+    if (!currentUser?.almazaraId) return null;
+    return (
+      <div className="md:hidden fixed top-2 right-16 bg-black/90 text-[#D9FF66] text-[9px] px-2 py-1 rounded-full font-mono z-[9999] pointer-events-none border border-white/10 shadow-lg">
+        ID: {currentUser.almazaraId.substring(0, 6)}
+      </div>
+    );
+  };
+
   if (isAuthChecking) return <div className="min-h-screen bg-[#F4F7F4] flex items-center justify-center font-bold text-gray-400">Cargando sistema...</div>;
 
   if (!isLoggedIn) {
@@ -834,10 +845,7 @@ const App: React.FC = () => {
                 </button>
               )}
 
-              {/* ID Visible en Móvil/Tablet */}
-              <div className="md:hidden fixed bottom-4 right-4 bg-black/80 text-white text-[10px] px-2 py-1 rounded-full font-mono z-50 backdrop-blur-sm pointer-events-none">
-                ID: {currentUser?.almazaraId?.substring(0, 6)}
-              </div>
+              <MobileIDBadge />
             </header>
             {renderContent()}
           </>

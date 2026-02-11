@@ -62,11 +62,12 @@ export const upsertAppConfig = async (config: AppConfig, skipQueue = false) => {
 };
 
 // --- PRODUCTORES ---
-export const fetchProducers = async (): Promise<Producer[]> => {
+export const fetchProducers = async (almazaraId?: string): Promise<Producer[]> => {
+    const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
         .from('producers')
         .select('*')
-        .eq('almazara_id', ALMAZARA_ID);
+        .eq('almazara_id', id);
 
     if (error) {
         console.error('Error fetching producers:', error);
@@ -88,7 +89,7 @@ export const upsertProducer = async (producer: Producer, skipQueue = false) => {
     return wrapUpsert('upsertProducer', producer, async () => {
         const { error } = await supabase.from('producers').upsert({
             id: producer.id,
-            almazara_id: ALMAZARA_ID,
+            almazara_id: producer.almazaraId || ALMAZARA_ID,
             name: producer.name,
             nif: producer.nif,
             total_kg_delivered: producer.totalKgDelivered,
@@ -99,11 +100,12 @@ export const upsertProducer = async (producer: Producer, skipQueue = false) => {
 };
 
 // --- VALES ---
-export const fetchVales = async (): Promise<Vale[]> => {
+export const fetchVales = async (almazaraId?: string): Promise<Vale[]> => {
+    const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
         .from('vales')
         .select('*')
-        .eq('almazara_id', ALMAZARA_ID);
+        .eq('almazara_id', id);
 
     if (error) {
         console.error('Error fetching vales:', error);
@@ -138,7 +140,7 @@ export const upsertVale = async (vale: Vale, skipQueue = false) => {
     return wrapUpsert('upsertVale', vale, async () => {
         const { error } = await supabase.from('vales').upsert({
             id: vale.id,
-            almazara_id: ALMAZARA_ID,
+            almazara_id: vale.almazaraId || ALMAZARA_ID,
             sequential_id: vale.id_vale,
             type: vale.tipo_vale === 'Para Molturar' ? 'A_MOLTURACION' : 'B_VENTA_DIRECTA',
             producer_id: vale.productor_id,
@@ -155,11 +157,12 @@ export const upsertVale = async (vale: Vale, skipQueue = false) => {
 };
 
 // --- TANQUES ---
-export const fetchTanks = async (): Promise<Tank[]> => {
+export const fetchTanks = async (almazaraId?: string): Promise<Tank[]> => {
+    const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
         .from('tanks')
         .select('*')
-        .eq('almazara_id', ALMAZARA_ID);
+        .eq('almazara_id', id);
 
     if (error) {
         console.error('Error fetching tanks:', error);
@@ -182,7 +185,7 @@ export const upsertTank = async (tank: Tank, skipQueue = false) => {
     return wrapUpsert('upsertTank', tank, async () => {
         const { error } = await supabase.from('tanks').upsert({
             id: tank.id,
-            almazara_id: ALMAZARA_ID,
+            almazara_id: tank.almazaraId || ALMAZARA_ID,
             name: tank.name,
             max_capacity_kg: tank.maxCapacityKg,
             current_kg: tank.currentKg,
@@ -202,11 +205,12 @@ export const deleteTank = async (id: number, skipQueue = false) => {
 };
 
 // --- TOLVAS ---
-export const fetchHoppers = async (): Promise<Hopper[]> => {
+export const fetchHoppers = async (almazaraId?: string): Promise<Hopper[]> => {
+    const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
         .from('hoppers')
         .select('*')
-        .eq('almazara_id', ALMAZARA_ID);
+        .eq('almazara_id', id);
 
     if (error) {
         console.error('Error fetching hoppers:', error);
@@ -226,7 +230,7 @@ export const upsertHopper = async (hopper: Hopper, skipQueue = false) => {
     return wrapUpsert('upsertHopper', hopper, async () => {
         const { error } = await supabase.from('hoppers').upsert({
             id: hopper.id,
-            almazara_id: ALMAZARA_ID,
+            almazara_id: hopper.almazaraId || ALMAZARA_ID,
             name: hopper.name,
             is_active: hopper.isActive
         });
@@ -242,11 +246,12 @@ export const deleteHopper = async (id: number, skipQueue = false) => {
 };
 
 // --- NODRIZA (NURSE TANK) ---
-export const fetchNurseTank = async (): Promise<NurseTank | null> => {
+export const fetchNurseTank = async (almazaraId?: string): Promise<NurseTank | null> => {
+    const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
         .from('nurse_tanks')
         .select('*')
-        .eq('almazara_id', ALMAZARA_ID)
+        .eq('almazara_id', id)
         .maybeSingle(); // Usamos maybeSingle para evitar error si no existe
 
     if (error) {
@@ -270,7 +275,7 @@ export const upsertNurseTank = async (nurseTank: NurseTank, skipQueue = false) =
     return wrapUpsert('upsertNurseTank', nurseTank, async () => {
         // Asumimos que la tabla nurse_tanks tiene almazara_id como Primary Key o Unique
         const { error } = await supabase.from('nurse_tanks').upsert({
-            almazara_id: ALMAZARA_ID,
+            almazara_id: nurseTank.almazaraId || ALMAZARA_ID,
             max_capacity_kg: nurseTank.maxCapacityKg,
             current_kg: nurseTank.currentKg,
             last_entry_date: nurseTank.lastEntryDate,
@@ -281,11 +286,12 @@ export const upsertNurseTank = async (nurseTank: NurseTank, skipQueue = false) =
 };
 
 // --- LOTES DE MOLTURACIÓN ---
-export const fetchMillingLots = async (): Promise<MillingLot[]> => {
+export const fetchMillingLots = async (almazaraId?: string): Promise<MillingLot[]> => {
+    const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
         .from('milling_lots')
         .select('*')
-        .eq('almazara_id', ALMAZARA_ID);
+        .eq('almazara_id', id);
 
     if (error) {
         console.error('Error fetching milling lots:', error);
@@ -312,7 +318,7 @@ export const upsertMillingLot = async (lot: MillingLot, skipQueue = false) => {
     return wrapUpsert('upsertMillingLot', lot, async () => {
         const { error } = await supabase.from('milling_lots').upsert({
             id: lot.id,
-            almazara_id: ALMAZARA_ID,
+            almazara_id: lot.almazaraId || ALMAZARA_ID,
             start_date: lot.fecha,
             hopper_id: lot.tolva_id,
             total_olives_kg: lot.kilos_aceituna,
@@ -329,7 +335,7 @@ export const upsertCustomer = async (customer: Customer, skipQueue = false) => {
     return wrapUpsert('upsertCustomer', customer, async () => {
         const { error } = await supabase.from('customers').upsert({
             id: customer.id,
-            almazara_id: ALMAZARA_ID,
+            almazara_id: customer.almazaraId || ALMAZARA_ID,
             name: customer.name,
             cif: customer.cif,
             address: customer.address,
@@ -343,11 +349,12 @@ export const upsertCustomer = async (customer: Customer, skipQueue = false) => {
 };
 
 // --- CLIENTES ---
-export const fetchCustomers = async (): Promise<Customer[]> => {
+export const fetchCustomers = async (almazaraId?: string): Promise<Customer[]> => {
+    const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
         .from('customers')
         .select('*')
-        .eq('almazara_id', ALMAZARA_ID);
+        .eq('almazara_id', id);
 
     if (error) {
         console.error('Error fetching customers:', error);
@@ -368,11 +375,12 @@ export const fetchCustomers = async (): Promise<Customer[]> => {
 };
 
 // --- TANDAS DIARIAS (PRODUCTION LOTS) ---
-export const fetchProductionLots = async (): Promise<ProductionLot[]> => {
+export const fetchProductionLots = async (almazaraId?: string): Promise<ProductionLot[]> => {
+    const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
         .from('production_lots')
         .select('*')
-        .eq('almazara_id', ALMAZARA_ID);
+        .eq('almazara_id', id);
 
     if (error) {
         console.error('Error fetching production lots:', error);
@@ -396,7 +404,7 @@ export const upsertProductionLot = async (lot: ProductionLot, skipQueue = false)
     return wrapUpsert('upsertProductionLot', lot, async () => {
         const { error } = await supabase.from('production_lots').upsert({
             id: lot.id,
-            almazara_id: ALMAZARA_ID,
+            almazara_id: lot.almazaraId || ALMAZARA_ID,
             date: lot.fecha,
             milling_lots_ids: lot.millingLotsIds,
             total_olive_kg: lot.totalOliveKg,
@@ -410,11 +418,12 @@ export const upsertProductionLot = async (lot: ProductionLot, skipQueue = false)
 };
 
 // --- LOTES DE ENVASADO ---
-export const fetchPackagingLots = async (): Promise<PackagingLot[]> => {
+export const fetchPackagingLots = async (almazaraId?: string): Promise<PackagingLot[]> => {
+    const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
         .from('packaging_lots')
         .select('*')
-        .eq('almazara_id', ALMAZARA_ID);
+        .eq('almazara_id', id);
 
     if (error) {
         console.error('Error fetching packaging lots:', error);
@@ -443,7 +452,7 @@ export const upsertPackagingLot = async (lot: PackagingLot, skipQueue = false) =
     return wrapUpsert('upsertPackagingLot', lot, async () => {
         const { error } = await supabase.from('packaging_lots').upsert({
             id: lot.id,
-            almazara_id: ALMAZARA_ID,
+            almazara_id: lot.almazaraId || ALMAZARA_ID,
             date: lot.date,
             type: lot.type,
             format: lot.format,
@@ -462,11 +471,12 @@ export const upsertPackagingLot = async (lot: PackagingLot, skipQueue = false) =
 };
 
 // --- MOVIMIENTOS Y AJUSTES ---
-export const fetchOilMovements = async (): Promise<OilMovement[]> => {
+export const fetchOilMovements = async (almazaraId?: string): Promise<OilMovement[]> => {
+    const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
         .from('oil_movements')
         .select('*')
-        .eq('almazara_id', ALMAZARA_ID);
+        .eq('almazara_id', id);
 
     if (error) {
         console.error('Error fetching oil movements:', error);
@@ -492,7 +502,7 @@ export const upsertOilMovement = async (mov: OilMovement, skipQueue = false) => 
     return wrapUpsert('upsertOilMovement', mov, async () => {
         const { error } = await supabase.from('oil_movements').upsert({
             id: mov.id,
-            almazara_id: ALMAZARA_ID,
+            almazara_id: mov.almazaraId || ALMAZARA_ID,
             date: mov.date,
             source_tank_id: mov.source_tank_id,
             target_tank_id: mov.target_tank_id,
@@ -508,11 +518,12 @@ export const upsertOilMovement = async (mov: OilMovement, skipQueue = false) => 
 };
 
 // --- PEDIDOS DE VENTA ---
-export const fetchSalesOrders = async (): Promise<SalesOrder[]> => {
+export const fetchSalesOrders = async (almazaraId?: string): Promise<SalesOrder[]> => {
+    const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
         .from('sales_orders')
         .select('*')
-        .eq('almazara_id', ALMAZARA_ID);
+        .eq('almazara_id', id);
 
     if (error) {
         console.error('Error fetching sales orders:', error);
@@ -535,7 +546,7 @@ export const upsertSalesOrder = async (order: SalesOrder, skipQueue = false) => 
     return wrapUpsert('upsertSalesOrder', order, async () => {
         const { error } = await supabase.from('sales_orders').upsert({
             id: order.id,
-            almazara_id: ALMAZARA_ID,
+            almazara_id: order.almazaraId || ALMAZARA_ID,
             date: order.date,
             customer_id: order.customerId,
             products: order.products,
@@ -548,11 +559,12 @@ export const upsertSalesOrder = async (order: SalesOrder, skipQueue = false) => 
 };
 
 // --- SALIDAS DE ORUJO ---
-export const fetchPomaceExits = async (): Promise<PomaceExit[]> => {
+export const fetchPomaceExits = async (almazaraId?: string): Promise<PomaceExit[]> => {
+    const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
         .from('pomace_exits')
         .select('*')
-        .eq('almazara_id', ALMAZARA_ID);
+        .eq('almazara_id', id);
 
     if (error) {
         console.error('Error fetching pomace exits:', error);
@@ -575,7 +587,7 @@ export const upsertPomaceExit = async (exit: PomaceExit, skipQueue = false) => {
     return wrapUpsert('upsertPomaceExit', exit, async () => {
         const { error } = await supabase.from('pomace_exits').upsert({
             id: exit.id,
-            almazara_id: ALMAZARA_ID,
+            almazara_id: exit.almazaraId || ALMAZARA_ID,
             date: exit.date,
             customer_id: exit.customerId,
             kg: exit.kg,
@@ -588,11 +600,12 @@ export const upsertPomaceExit = async (exit: PomaceExit, skipQueue = false) => {
 };
 
 // --- ENTRADAS AUXILIARES ---
-export const fetchAuxEntries = async (): Promise<AuxEntry[]> => {
+export const fetchAuxEntries = async (almazaraId?: string): Promise<AuxEntry[]> => {
+    const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
         .from('aux_entries')
         .select('*')
-        .eq('almazara_id', ALMAZARA_ID);
+        .eq('almazara_id', id);
 
     if (error) {
         console.error('Error fetching aux entries:', error);
@@ -616,7 +629,7 @@ export const upsertAuxEntry = async (entry: AuxEntry, skipQueue = false) => {
     return wrapUpsert('upsertAuxEntry', entry, async () => {
         const { error } = await supabase.from('aux_entries').upsert({
             id: entry.id,
-            almazara_id: ALMAZARA_ID,
+            almazara_id: entry.almazaraId || ALMAZARA_ID,
             date: entry.date,
             supplier: entry.supplier,
             material_type: entry.materialType,
@@ -630,11 +643,12 @@ export const upsertAuxEntry = async (entry: AuxEntry, skipQueue = false) => {
 };
 
 // --- SALIDAS DE ACEITE (BULK/EXIT) ---
-export const fetchOilExits = async (): Promise<OilExit[]> => {
+export const fetchOilExits = async (almazaraId?: string): Promise<OilExit[]> => {
+    const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
         .from('oil_exits')
         .select('*')
-        .eq('almazara_id', ALMAZARA_ID);
+        .eq('almazara_id', id);
 
     if (error) {
         console.error('Error fetching oil exits:', error);
@@ -662,7 +676,7 @@ export const upsertOilExit = async (exit: OilExit, skipQueue = false) => {
     return wrapUpsert('upsertOilExit', exit, async () => {
         const { error } = await supabase.from('oil_exits').upsert({
             id: exit.id,
-            almazara_id: ALMAZARA_ID,
+            almazara_id: exit.almazaraId || ALMAZARA_ID,
             tank_id: exit.tank_id,
             type: exit.type,
             date: exit.date,
