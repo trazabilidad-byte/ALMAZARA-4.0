@@ -460,19 +460,19 @@ const App: React.FC = () => {
             fetchNurseTank(activeId)
           ]);
 
-          if (p) setProducers(p);
-          if (v) setVales(v);
-          if (t) setTanks(t);
-          if (h) setHoppers(h);
-          if (m) setMillingLots(m);
-          if (c) setCustomers(c);
-          if (pl) setProductionLots(pl);
-          if (pk) setPackagingLots(pk);
-          if (om) setOilMovements(om);
-          if (so) setSalesOrders(so);
-          if (pe) setPomaceExits(pe);
-          if (ae) setAuxEntries(ae);
-          if (oe) setOilExits(oe);
+          if (p && p.length > 0) setProducers(p);
+          if (v && v.length > 0) setVales(v);
+          if (t && t.length > 0) setTanks(t);
+          if (h && h.length > 0) setHoppers(h);
+          if (m && m.length > 0) setMillingLots(m);
+          if (c && c.length > 0) setCustomers(c);
+          if (pl && pl.length > 0) setProductionLots(pl);
+          if (pk && pk.length > 0) setPackagingLots(pk);
+          if (om && om.length > 0) setOilMovements(om);
+          if (so && so.length > 0) setSalesOrders(so);
+          if (pe && pe.length > 0) setPomaceExits(pe);
+          if (ae && ae.length > 0) setAuxEntries(ae);
+          if (oe && oe.length > 0) setOilExits(oe);
           if (nt) setNurseTank(nt);
 
           console.log("Carga de datos transaccionales completada");
@@ -789,7 +789,7 @@ const App: React.FC = () => {
   const MobileIDBadge = () => {
     if (!currentUser?.almazaraId) return null;
     return (
-      <div className="md:hidden fixed top-2 right-16 bg-black/90 text-[#D9FF66] text-[9px] px-2 py-1 rounded-full font-mono z-[9999] pointer-events-none border border-white/10 shadow-lg">
+      <div className="fixed top-2 right-2 md:top-2 md:right-16 bg-[#D9FF66] text-black text-[10px] px-3 py-1.5 rounded-full font-black font-mono z-[9999] border-2 border-black shadow-2xl pointer-events-none">
         ID: {currentUser.almazaraId.substring(0, 6)}
       </div>
     );
