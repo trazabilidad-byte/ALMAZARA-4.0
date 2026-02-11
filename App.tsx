@@ -108,7 +108,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [appConfig, setAppConfig] = useState<AppConfig>(() => getPersistedState('app_config', DEFAULT_APP_CONFIG));
+  const [appConfig, setAppConfig] = useState<AppConfig>(() => sanitizeConfig(getPersistedState('app_config', DEFAULT_APP_CONFIG)));
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar_collapsed');
     return saved === 'true';
@@ -143,6 +143,21 @@ const App: React.FC = () => {
       console.error(`Error loading ${key}`, e);
       return defaultValue;
     }
+  };
+
+  // --- SAFETY CHECK: Sanitize Config on Load ---
+  // Esto previene la pantalla blanca si faltan campos nuevos en la configuración guardada
+  const sanitizeConfig = (config: AppConfig): AppConfig => {
+    return {
+      ...config,
+      authorizedUsers: Array.isArray(config.authorizedUsers) ? config.authorizedUsers : [],
+      packagingFormats: Array.isArray(config.packagingFormats) ? config.packagingFormats : [],
+      auxiliaryProducts: Array.isArray(config.auxiliaryProducts) ? config.auxiliaryProducts : [],
+      dashboardWidgets: Array.isArray(config.dashboardWidgets) ? config.dashboardWidgets : [],
+      sidebarConfig: Array.isArray(config.sidebarConfig) ? config.sidebarConfig : [],
+      pastCampaigns: Array.isArray(config.pastCampaigns) ? config.pastCampaigns : [],
+      varietySettings: config.varietySettings || {}
+    };
   };
 
   const [tanks, setTanks] = useState<Tank[]>(() => getPersistedState('app_tanks', Array.from({ length: 12 }, (_, i) => ({

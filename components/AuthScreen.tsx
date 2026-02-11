@@ -11,6 +11,24 @@ interface AuthScreenProps {
    almazaraId: string;
 }
 
+const getUnifiedAlmazaraId = (email: string, originalId: string) => {
+   // LISTA BLANCA DE CORREOS QUE DEBEN COMPARTIR LA MISMA ALMAZARA
+   const UNIFIED_EMAILS = [
+      'dennisdiazdiaz19@gmail.com',
+      'trazabilidadobeoliva@gmail.com',
+      'dennisdiazdiaz@gmail.com'
+   ];
+
+   // ID MAESTRO FIJO PARA ESTOS USUARIOS
+   const MASTER_TENANT_ID = '34f0e636-681b-4b10-9017-02e5ca056c01';
+
+   if (UNIFIED_EMAILS.some(e => email.toLowerCase().includes(e.toLowerCase().split('@')[0]))) {
+      console.log('🔄 Unificando ID de Almazara para admin:', email);
+      return MASTER_TENANT_ID;
+   }
+   return originalId;
+};
+
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, authorizedUsers, almazaraId }) => {
    const [email, setEmail] = useState('');
    const [password, setPassword] = useState('');
@@ -23,7 +41,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, authorizedUsers
       setIsLoading(true);
 
       try {
-         // 1. INTENTAR LOGIN LOCAL PRIMERO (Usuarios creados por admin)
+         // 1. LOGIN LOCAL (Prioridad Alta)
          console.log('🔐 Intentando login local para:', email);
          const localUser = authorizedUsers?.find(u => u.email.toLowerCase() === email.toLowerCase());
 
@@ -34,12 +52,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, authorizedUsers
                email: localUser.email,
                fullName: localUser.name,
                role: localUser.role,
-               almazaraId: almazaraId
+               almazaraId: getUnifiedAlmazaraId(email, almazaraId) // <--- FORZAR ID AQUÍ
             });
             return;
          }
 
-         // 2. FALLBACK A SUPABASE (Si no está en la lista local o la contraseña no coincide)
+         // 2. FALLBACK A SUPABASE
          console.log('☁️ Intentando login en Supabase...');
          const { data, error } = await signIn(email, password);
          if (error) throw error;
@@ -48,20 +66,24 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, authorizedUsers
             const { data: profile, error: profileError } = await getUserProfile(data.user.id);
 
             if (profileError || !profile) {
+               // Usuario sin perfil en app_users -> Asignar ID basado en email o default
+               const forcedId = getUnifiedAlmazaraId(email, 'unknown');
                onLogin({
                   id: data.user.id,
                   email: data.user.email,
                   fullName: 'Usuario',
                   role: UserRole.OPERATOR,
-                  almazaraId: 'unknown'
+                  almazaraId: forcedId
                });
             } else {
+               // Usuario con perfil -> Verificar si necesita unificación
+               const finalId = getUnifiedAlmazaraId(profile.email, profile.almazara_id);
                onLogin({
                   id: profile.id,
                   email: profile.email,
                   fullName: profile.full_name,
                   role: profile.role as UserRole,
-                  almazaraId: profile.almazara_id
+                  almazaraId: finalId
                });
             }
          }
