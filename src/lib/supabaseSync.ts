@@ -105,7 +105,7 @@ export const upsertProducer = async (producer: Producer, skipQueue = false) => {
             address: producer.address,
             email: producer.email,
             phone: producer.phone,
-            total_kg_delivered: producer.totalKgDelivered || 0,
+            total_kg_delivered: Number(producer.totalKgDelivered) || 0,
             status: producer.status
         });
         return { error };
@@ -160,9 +160,9 @@ export const upsertVale = async (vale: Vale, skipQueue = false) => {
             producer_id: vale.productor_id,
             producer_name: vale.productor_name,
             parcela: vale.parcela,
-            weight_kg: vale.kilos_netos,
-            fat_percentage: vale.analitica.rendimiento_graso,
-            acidity: vale.analitica.acidez,
+            weight_kg: Number(vale.kilos_netos) || 0,
+            fat_percentage: Number(vale.analitica.rendimiento_graso) || 0,
+            acidity: Number(vale.analitica.acidez) || 0,
             date: vale.fecha_entrada,
             variety: vale.variedad,
             status: vale.estado as any,
