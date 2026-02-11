@@ -162,7 +162,7 @@ export const upsertVale = async (vale: Vale, skipQueue = false) => {
             parcela: vale.parcela,
             weight_kg: vale.kilos_netos,
             fat_percentage: vale.analitica.rendimiento_graso,
-            acidez: vale.analitica.acidez,
+            acidity: vale.analitica.acidez,
             date: vale.fecha_entrada,
             variety: vale.variedad,
             status: vale.estado as any,
