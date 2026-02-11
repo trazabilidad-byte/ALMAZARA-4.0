@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 import { Producer, Vale, MillingLot, AppConfig, Tank, Hopper, UserRole, ProducerStatus, ValeStatus, OliveVariety, Customer, ProductionLot, PackagingLot, OilMovement, SalesOrder, PomaceExit, AuxEntry, CustomerStatus, OilExit, NurseTank } from '../../types';
 import { syncQueue } from './syncQueue';
 
-export let ALMAZARA_ID = import.meta.env.VITE_ALMAZARA_ID || 'private-user';
+export let ALMAZARA_ID = import.meta.env.VITE_ALMAZARA_ID || '';
 
 export const setSyncAlmazaraId = (id: string) => {
     if (id && id !== 'unknown' && id !== 'null') {
@@ -93,6 +93,12 @@ export const fetchProducers = async (almazaraId?: string): Promise<Producer[]> =
 };
 
 export const upsertProducer = async (producer: Producer, skipQueue = false) => {
+    console.log("📤 Intentando guardar productor en Supabase:", {
+        id: producer.id,
+        name: producer.name,
+        almazaraId: producer.almazaraId || ALMAZARA_ID
+    });
+
     return wrapUpsert('upsertProducer', producer, async () => {
         const { error } = await supabase.from('producers').upsert({
             id: producer.id,
@@ -108,6 +114,13 @@ export const upsertProducer = async (producer: Producer, skipQueue = false) => {
             total_kg_delivered: Number(producer.totalKgDelivered) || 0,
             status: producer.status
         });
+
+        if (error) {
+            console.error("❌ Error guardando productor:", error);
+        } else {
+            console.log("✅ Productor guardado exitosamente en Supabase");
+        }
+
         return { error };
     }, skipQueue);
 };

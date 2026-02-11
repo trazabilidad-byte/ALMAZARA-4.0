@@ -23,7 +23,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onSave, onCancel, in
     e.preventDefault();
     if (formData.name && formData.cif) {
       onSave({
-        id: initialData?.id || Date.now().toString(),
+        id: initialData?.id || '',
         almazaraId: initialData?.almazaraId || 'unknown',
         name: formData.name,
         cif: formData.cif,
@@ -67,8 +67,8 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onSave, onCancel, in
                   type="button"
                   onClick={() => setFormData({ ...formData, type })}
                   className={`py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${formData.type === type
-                      ? 'bg-[#111111] text-[#D9FF66] border-[#111111]'
-                      : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
+                    ? 'bg-[#111111] text-[#D9FF66] border-[#111111]'
+                    : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
                     }`}
                 >
                   {type}

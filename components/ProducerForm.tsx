@@ -24,7 +24,7 @@ export const ProducerForm: React.FC<ProducerFormProps> = ({ onSave, onCancel, in
     e.preventDefault();
     if (formData.name && formData.nif) {
       onSave({
-        id: initialData?.id || Date.now().toString(),
+        id: initialData?.id || '',
         almazaraId: initialData?.almazaraId || 'unknown',
         name: formData.name,
         nif: formData.nif,
