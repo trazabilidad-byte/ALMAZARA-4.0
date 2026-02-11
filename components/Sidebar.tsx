@@ -81,7 +81,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <div className="hidden lg:block overflow-hidden">
                 <p className="text-sm font-semibold truncate max-w-[120px]">{currentUser?.fullName ? String(currentUser.fullName) : 'Administrador'}</p>
-                <p className="text-[10px] text-gray-500 uppercase truncate">Uso Privado</p>
+                <p className="text-[9px] text-gray-500 uppercase truncate font-mono">
+                  ID: {currentUser?.almazaraId?.substring(0, 8) || 'Unknown'}
+                </p>
               </div>
             )}
           </div>

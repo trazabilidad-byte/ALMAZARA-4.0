@@ -571,9 +571,35 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
+    // 1. Limpiar LocalStorage para evitar fugas de datos
+    const keysToRemove = [
+      'app_vales', 'app_producers', 'app_customers', 'app_millingLots',
+      'app_productionLots', 'app_oilExits', 'app_salesOrders',
+      'app_pomaceExits', 'app_packagingLots', 'app_finishedProducts',
+      'app_auxEntries', 'app_oilMovements', 'app_tanks', 'app_nurseTank',
+      'app_hoppers', 'app_config'
+    ];
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+
+    // 2. Limpiar Estado en Memoria
+    setVales([]);
+    setProducers([]);
+    setCustomers([]);
+    setMillingLots([]);
+    setProductionLots([]);
+    setOilExits([]);
+    setSalesOrders([]);
+    setPomaceExits([]);
+    setPackagingLots([]);
+    setFinishedProducts([]);
+    setAuxEntries([]);
+    setOilMovements([]);
+    // No limpiamos tanques/tolvas para no romper UI visualmente, pero se recargarán
+
     setIsLoggedIn(false);
     setCurrentUser(null);
     setActiveTab('dashboard');
+    window.location.reload(); // Forzar recarga para asegurar limpieza total
   };
 
   const handleCloseCampaign = () => {
