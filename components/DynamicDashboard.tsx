@@ -566,6 +566,7 @@ export const DynamicDashboard: React.FC<DynamicDashboardProps> = ({
                     oilMovements={oilMovements}
                     oilExits={oilExits}
                     productionLots={productionLots}
+                    config={config}
                     onClose={() => setSelectedTank(null)}
                     onViewLot={onViewLot}
                     onViewVale={onViewValeDetails}

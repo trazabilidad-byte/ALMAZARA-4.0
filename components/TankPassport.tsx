@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Tank, MillingLot, Vale, Producer, OilMovement, OilExit, ExitType, ProductionLot } from '../types';
+import { Tank, MillingLot, Vale, Producer, OilMovement, OilExit, ExitType, ProductionLot, AppConfig } from '../types';
 import {
     X, History, Factory, User, Truck, Package, Download, Lock, RefreshCw, Calculator, ArrowRight, CheckCircle2
 } from 'lucide-react';
@@ -16,6 +16,7 @@ interface TankPassportProps {
     oilMovements: OilMovement[];
     oilExits: OilExit[];
     productionLots: ProductionLot[];
+    config: AppConfig; // Nuevo: para obtener currentCampaign
     onClose: () => void;
     // onDownloadPDF is removed as it's now internal
 
@@ -37,6 +38,7 @@ export const TankPassport: React.FC<TankPassportProps> = ({
     oilMovements,
     oilExits,
     productionLots,
+    config,
     onClose,
 
     onCloseTankLot,
@@ -134,7 +136,7 @@ export const TankPassport: React.FC<TankPassportProps> = ({
 
     const handleDownloadPDF = () => {
         const doc = new jsPDF();
-        const campaign = "23/24";
+        const campaign = config.currentCampaign; // Usar campaña actual de la configuración
 
         doc.setFontSize(18);
         doc.setTextColor(17, 17, 17);

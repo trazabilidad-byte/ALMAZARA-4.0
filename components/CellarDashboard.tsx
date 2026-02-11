@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Tank, MillingLot, Vale, Producer, OliveVariety, OilMovement, OilExit, ExitType, ProductionLot } from '../types';
+import { Tank, MillingLot, Vale, Producer, OliveVariety, OilMovement, OilExit, ExitType, ProductionLot, AppConfig } from '../types';
 import {
     ArrowRightLeft, AlertTriangle, Info, Droplets, ArrowRight,
     X, History, Scale, FileText, CheckCircle2, Factory, User, Search, Truck, Package, RotateCcw, Lock, ChevronDown, RefreshCw, Calculator, Download
@@ -18,6 +18,7 @@ interface CellarDashboardProps {
     oilMovements: OilMovement[];
     oilExits?: OilExit[];
     productionLots?: ProductionLot[];
+    config: AppConfig; // Nuevo: para pasar a TankPassport
     initialSelectedTankId?: number | null;
     onTransfer: (data: { sourceTankId: number, targetTankId: number, kg: number, date: string }) => void;
     onResetTank: (tankId: number) => void;
@@ -37,6 +38,7 @@ export const CellarDashboard: React.FC<CellarDashboardProps> = ({
     oilMovements,
     oilExits = [],
     productionLots = [],
+    config,
     initialSelectedTankId,
     onTransfer,
     onResetTank,
@@ -286,6 +288,7 @@ export const CellarDashboard: React.FC<CellarDashboardProps> = ({
                     oilMovements={oilMovements}
                     oilExits={oilExits}
                     productionLots={productionLots}
+                    config={config}
                     onClose={() => setSelectedTank(null)}
                     onCloseTankLot={handleCloseLot}
                     onResetTank={handleResetTank}
