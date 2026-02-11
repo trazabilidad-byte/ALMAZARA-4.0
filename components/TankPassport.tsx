@@ -57,20 +57,27 @@ export const TankPassport: React.FC<TankPassportProps> = ({
     }, [selectedTank, productionLots]);
 
     const tankDates = useMemo(() => {
-        const dates = tankProductionLots.map(lp => new Date(lp.fecha).getTime());
+        const dates: number[] = [];
+
+        // 1. Agregar fechas de production lots que van a este tanque
+        tankProductionLots.forEach(lp => dates.push(new Date(lp.fecha).getTime()));
+
+        // 2. Agregar fechas de TODAS las entradas de aceite al tanque (oilMovements donde target es este tanque)
+        const entries = oilMovements.filter(m => m.target_tank_id === selectedTank.id);
+        entries.forEach(e => dates.push(new Date(e.date).getTime()));
+
+        // Si no hay ningún movimiento, usar null en lugar de "hoy"
         if (dates.length === 0) {
-            const entries = oilMovements.filter(m => m.target_tank_id === selectedTank.id);
-            entries.forEach(e => dates.push(new Date(e.date).getTime()));
+            return { start: null, last: null, end: null };
         }
 
-        let startDate = dates.length > 0 ? new Date(Math.min(...dates)) : new Date();
-        const lastEntryDate = dates.length > 0 ? new Date(Math.max(...dates)) : new Date();
+        let startDate = new Date(Math.min(...dates));
+        const lastEntryDate = new Date(Math.max(...dates));
 
         let endDate = null;
         if (selectedTank.status === 'FULL') {
             const closeEvent = oilMovements.find(m => m.id.startsWith(`CLOSURE-${selectedTank.id}`));
             endDate = closeEvent ? new Date(closeEvent.date) : lastEntryDate;
-            if (!closeEvent && dates.length === 0) endDate = new Date();
         }
 
         return { start: startDate, last: lastEntryDate, end: endDate };
@@ -296,7 +303,7 @@ export const TankPassport: React.FC<TankPassportProps> = ({
                                     </p>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mt-2">
-                                    <div><p className="text-[9px] font-black text-gray-400 uppercase">Fecha Inicio</p><p className={`text-sm font-black ${selectedTank.status === 'FULL' ? 'text-black' : 'text-[#111111]'}`}>{tankDates.start.toLocaleDateString()}</p></div>
+                                    <div><p className="text-[9px] font-black text-gray-400 uppercase">Fecha Inicio</p><p className={`text-sm font-black ${selectedTank.status === 'FULL' ? 'text-black' : 'text-[#111111]'}`}>{tankDates.start ? tankDates.start.toLocaleDateString() : '---'}</p></div>
                                     <div><p className="text-[9px] font-black text-gray-400 uppercase">Fecha Cierre</p><p className={`text-sm font-black ${selectedTank.status === 'FULL' ? 'text-black' : 'text-[#111111]'}`}>{selectedTank.status === 'FULL' && tankDates.end ? tankDates.end.toLocaleDateString() : '---'}</p></div>
                                 </div>
                             </div>
