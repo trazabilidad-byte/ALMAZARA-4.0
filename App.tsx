@@ -58,6 +58,42 @@ const APP_NAME = "ALMAZARA PRIVADA 4.0";
 const CAMPAIGN = "2025/2026";
 const OWNER_NAME = "Administrador";
 
+// --- HELPERS: DEFINED BEFORE USE TO AVOID REFERENCE ERROR ---
+
+// Helper para inicializar estado desde localStorage
+const getPersistedState = <T,>(key: string, defaultValue: T): T => {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Si es un objeto (no array), fusionar con defaultValue para asegurar que existan los nuevos campos
+      if (typeof defaultValue === 'object' && defaultValue !== null && !Array.isArray(defaultValue)) {
+        return { ...defaultValue, ...parsed };
+      }
+      return parsed;
+    }
+    return defaultValue;
+  } catch (e) {
+    console.error(`Error loading ${key}`, e);
+    return defaultValue;
+  }
+};
+
+// --- SAFETY CHECK: Sanitize Config on Load ---
+// Esto previene la pantalla blanca si faltan campos nuevos en la configuración guardada
+const sanitizeConfig = (config: AppConfig): AppConfig => {
+  return {
+    ...config,
+    authorizedUsers: Array.isArray(config.authorizedUsers) ? config.authorizedUsers : [],
+    packagingFormats: Array.isArray(config.packagingFormats) ? config.packagingFormats : [],
+    auxiliaryProducts: Array.isArray(config.auxiliaryProducts) ? config.auxiliaryProducts : [],
+    dashboardWidgets: Array.isArray(config.dashboardWidgets) ? config.dashboardWidgets : [],
+    sidebarConfig: Array.isArray(config.sidebarConfig) ? config.sidebarConfig : [],
+    pastCampaigns: Array.isArray(config.pastCampaigns) ? config.pastCampaigns : [],
+    varietySettings: config.varietySettings || {}
+  };
+};
+
 const DEFAULT_APP_CONFIG: AppConfig = {
   almazaraId: 'unknown',
   companyName: APP_NAME,
@@ -108,7 +144,10 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+
+  // Usamos las funciones del scope global
   const [appConfig, setAppConfig] = useState<AppConfig>(() => sanitizeConfig(getPersistedState('app_config', DEFAULT_APP_CONFIG)));
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar_collapsed');
     return saved === 'true';
@@ -122,42 +161,6 @@ const App: React.FC = () => {
       localStorage.setItem('sidebar_collapsed', String(newState));
       return newState;
     });
-  };
-
-  // --- PERSISTENCIA Y ESTADO GLOBAL ---
-
-  // Helper para inicializar estado desde localStorage
-  const getPersistedState = <T,>(key: string, defaultValue: T): T => {
-    try {
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Si es un objeto (no array), fusionar con defaultValue para asegurar que existan los nuevos campos
-        if (typeof defaultValue === 'object' && defaultValue !== null && !Array.isArray(defaultValue)) {
-          return { ...defaultValue, ...parsed };
-        }
-        return parsed;
-      }
-      return defaultValue;
-    } catch (e) {
-      console.error(`Error loading ${key}`, e);
-      return defaultValue;
-    }
-  };
-
-  // --- SAFETY CHECK: Sanitize Config on Load ---
-  // Esto previene la pantalla blanca si faltan campos nuevos en la configuración guardada
-  const sanitizeConfig = (config: AppConfig): AppConfig => {
-    return {
-      ...config,
-      authorizedUsers: Array.isArray(config.authorizedUsers) ? config.authorizedUsers : [],
-      packagingFormats: Array.isArray(config.packagingFormats) ? config.packagingFormats : [],
-      auxiliaryProducts: Array.isArray(config.auxiliaryProducts) ? config.auxiliaryProducts : [],
-      dashboardWidgets: Array.isArray(config.dashboardWidgets) ? config.dashboardWidgets : [],
-      sidebarConfig: Array.isArray(config.sidebarConfig) ? config.sidebarConfig : [],
-      pastCampaigns: Array.isArray(config.pastCampaigns) ? config.pastCampaigns : [],
-      varietySettings: config.varietySettings || {}
-    };
   };
 
   const [tanks, setTanks] = useState<Tank[]>(() => getPersistedState('app_tanks', Array.from({ length: 12 }, (_, i) => ({
