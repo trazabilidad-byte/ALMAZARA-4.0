@@ -443,53 +443,56 @@ const App: React.FC = () => {
   };
 
   // --- LÓGICA DE CARGA DESDE SUPABASE ---
+  const refreshAllData = async () => {
+    if (!currentUser) return;
+    const activeId = currentUser.almazaraId;
+    console.log("Forzando recarga de datos de Supabase para Almazara:", activeId);
+    setSyncAlmazaraId(activeId);
+
+    try {
+      const [p, v, t, h, m, c, pl, pk, om, so, pe, ae, oe, nt] = await Promise.all([
+        fetchProducers(activeId),
+        fetchVales(activeId),
+        fetchTanks(activeId),
+        fetchHoppers(activeId),
+        fetchMillingLots(activeId),
+        fetchCustomers(activeId),
+        fetchProductionLots(activeId),
+        fetchPackagingLots(activeId),
+        fetchOilMovements(activeId),
+        fetchSalesOrders(activeId),
+        fetchPomaceExits(activeId),
+        fetchAuxEntries(activeId),
+        fetchOilExits(activeId),
+        fetchNurseTank(activeId)
+      ]);
+
+      // Guardas Inteligentes: Si el servidor retorna datos, los tomamos. 
+      // Para tablas críticas como Tanques/Tolvas, si retorna vacío ignoramos para no borrar el layout local por defecto.
+      if (p) setProducers(p); // Los productores si pueden ser []
+      if (v) setVales(v);
+      if (t && t.length > 0) setTanks(t);
+      if (h && h.length > 0) setHoppers(h);
+      if (m) setMillingLots(m);
+      if (c) setCustomers(c);
+      if (pl) setProductionLots(pl);
+      if (pk) setPackagingLots(pk);
+      if (om) setOilMovements(om);
+      if (so) setSalesOrders(so);
+      if (pe) setPomaceExits(pe);
+      if (ae) setAuxEntries(ae);
+      if (oe) setOilExits(oe);
+      if (nt) setNurseTank(nt);
+
+      console.log("Carga de datos transaccionales completada");
+    } catch (error) {
+      console.error("Error cargando históricos de Supabase:", error);
+    }
+  };
+
   useEffect(() => {
     if (isLoggedIn && currentUser) {
-      const activeId = currentUser.almazaraId;
-      console.log("Cargando datos reales de Supabase para Almazara:", activeId);
-      setSyncAlmazaraId(activeId);
-
-      const loadData = async () => {
-        try {
-          const [p, v, t, h, m, c, pl, pk, om, so, pe, ae, oe, nt] = await Promise.all([
-            fetchProducers(activeId),
-            fetchVales(activeId),
-            fetchTanks(activeId),
-            fetchHoppers(activeId),
-            fetchMillingLots(activeId),
-            fetchCustomers(activeId),
-            fetchProductionLots(activeId),
-            fetchPackagingLots(activeId),
-            fetchOilMovements(activeId),
-            fetchSalesOrders(activeId),
-            fetchPomaceExits(activeId),
-            fetchAuxEntries(activeId),
-            fetchOilExits(activeId),
-            fetchNurseTank(activeId)
-          ]);
-
-          if (p && p.length > 0) setProducers(p);
-          if (v && v.length > 0) setVales(v);
-          if (t && t.length > 0) setTanks(t);
-          if (h && h.length > 0) setHoppers(h);
-          if (m && m.length > 0) setMillingLots(m);
-          if (c && c.length > 0) setCustomers(c);
-          if (pl && pl.length > 0) setProductionLots(pl);
-          if (pk && pk.length > 0) setPackagingLots(pk);
-          if (om && om.length > 0) setOilMovements(om);
-          if (so && so.length > 0) setSalesOrders(so);
-          if (pe && pe.length > 0) setPomaceExits(pe);
-          if (ae && ae.length > 0) setAuxEntries(ae);
-          if (oe && oe.length > 0) setOilExits(oe);
-          if (nt) setNurseTank(nt);
-
-          console.log("Carga de datos transaccionales completada");
-        } catch (error) {
-          console.error("Error cargando históricos de Supabase:", error);
-        }
-      };
-
-      loadData();
+      refreshAllData();
     }
   }, [isLoggedIn, currentUser]);
 
@@ -797,7 +800,7 @@ const App: React.FC = () => {
   const MobileIDBadge = () => {
     if (!currentUser?.almazaraId) return null;
     return (
-      <div className="fixed bottom-2 left-2 bg-[#D9FF66] text-black text-[10px] px-3 py-1.5 rounded-full font-black font-mono z-[99999] border-2 border-black shadow-2xl pointer-events-none">
+      <div className="fixed bottom-2 right-2 bg-[#D9FF66] text-black text-[10px] px-3 py-1.5 rounded-full font-black font-mono z-[99999] border-2 border-black shadow-2xl pointer-events-none">
         ID: {currentUser.almazaraId.substring(0, 6)}
       </div>
     );
@@ -839,9 +842,18 @@ const App: React.FC = () => {
                   {pendingCount > 0 && (
                     <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest animate-pulse">
                       <RefreshCw size={10} className={isSyncing ? 'animate-spin' : ''} />
-                      {pendingCount} Pendientes de subir
+                      {pendingCount} Pendientes
                     </div>
                   )}
+
+                  <button
+                    onClick={() => refreshAllData()}
+                    className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white hover:bg-gray-100 text-black text-[10px] font-black uppercase tracking-widest border border-black/10 transition-all shadow-sm"
+                    title="Recargar datos de la nube"
+                  >
+                    <RefreshCw size={10} className={isSyncing ? 'animate-spin' : ''} />
+                    Sincronizar
+                  </button>
                 </div>
                 <h1 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tighter text-[#111111] uppercase">
                   {String(NAV_ITEMS.find(n => n.id === activeTab)?.label || 'Panel de Control')}

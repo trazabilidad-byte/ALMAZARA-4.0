@@ -1,5 +1,5 @@
 
-import { supabase } from './src/lib/supabase';
+import { supabase } from './supabase';
 
 export interface SyncOperation {
     id: string;
