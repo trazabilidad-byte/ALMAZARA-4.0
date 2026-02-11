@@ -75,8 +75,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="mt-auto pt-4 border-t border-gray-800 shrink-0">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full border border-gray-700 bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-400 shrink-0">
+            <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full border border-gray-700 bg-gray-800 flex flex-col items-center justify-center text-xs font-bold text-gray-400 shrink-0 relative group`}>
               {currentUser?.fullName ? String(currentUser.fullName).charAt(0) : 'A'}
+
+              {/* Tooltip con ID para modo colapsado */}
+              {isCollapsed && (
+                <div className="absolute left-10 bg-black text-white text-[10px] p-2 rounded shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-mono">
+                  ID: {currentUser?.almazaraId?.substring(0, 8)}
+                </div>
+              )}
             </div>
             {!isCollapsed && (
               <div className="hidden lg:block overflow-hidden">

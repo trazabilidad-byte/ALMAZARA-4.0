@@ -232,6 +232,25 @@ const App: React.FC = () => {
   const [externalOpenTankId, setExternalOpenTankId] = useState<number | null>(null);
 
   useEffect(() => {
+    // NUCLEAR OPTION: Limpieza forzada de caché al subir versión
+    const SYS_VERSION = '4.1';
+    const storedVersion = localStorage.getItem('sys_version');
+
+    if (storedVersion !== SYS_VERSION) {
+      console.log("Detectada nueva versión. Limpiando caché local...");
+      const keysToRemove = [
+        'app_vales', 'app_producers', 'app_customers', 'app_millingLots',
+        'app_productionLots', 'app_oilExits', 'app_salesOrders',
+        'app_pomaceExits', 'app_packagingLots', 'app_finishedProducts',
+        'app_auxEntries', 'app_oilMovements', 'app_tanks', 'app_nurseTank',
+        'app_hoppers', 'app_config'
+      ];
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+      localStorage.setItem('sys_version', SYS_VERSION);
+      window.location.reload();
+      return;
+    }
+
     const timer = setTimeout(() => setIsAuthChecking(false), 300);
     return () => clearTimeout(timer);
   }, []);
@@ -809,11 +828,15 @@ const App: React.FC = () => {
                   {String(NAV_ITEMS.find(n => n.id === activeTab)?.label || 'Panel de Control')}
                 </h1>
               </div>
-              {currentUser?.role !== UserRole.VIEWER && !['dashboard', 'config', 'cellar', 'packaging', 'auxiliary', 'sales', 'analytics', 'traceability', 'direct_sales', 'milling'].includes(activeTab) && (
-                <button onClick={handleRegisterClick} className="flex items-center justify-center gap-2 bg-[#111111] text-white px-7 py-4 rounded-3xl font-black text-sm shadow-xl border-b-4 border-[#D9FF66] uppercase">
-                  <Plus size={18} /> Nuevo Registro
-                </button>
+              <button onClick={handleRegisterClick} className="flex items-center justify-center gap-2 bg-[#111111] text-white px-7 py-4 rounded-3xl font-black text-sm shadow-xl border-b-4 border-[#D9FF66] uppercase">
+                <Plus size={18} /> Nuevo Registro
+              </button>
               )}
+
+              {/* ID Visible en Móvil/Tablet */}
+              <div className="md:hidden fixed bottom-4 right-4 bg-black/80 text-white text-[10px] px-2 py-1 rounded-full font-mono z-50 backdrop-blur-sm pointer-events-none">
+                ID: {currentUser?.almazaraId?.substring(0, 6)}
+              </div>
             </header>
             {renderContent()}
           </>
