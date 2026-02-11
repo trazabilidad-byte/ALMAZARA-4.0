@@ -21,8 +21,9 @@ import { DynamicDashboard } from './components/DynamicDashboard';
 import { AuthScreen } from './components/AuthScreen';
 import { Tank, UserRole, Producer, Vale, Hopper, MillingLot, Customer, OilExit, OilMovement, NurseTank, PackagingLot, FinishedProduct, AuxEntry, AuxStock, SalesOrder, PomaceExit, AppConfig, User, UserRole as Role, ValeType, ValeStatus, OliveVariety, ExitType, ProductionLot } from './types';
 import { NAV_ITEMS } from './constants';
-import { Plus, CalendarRange, ShieldCheck, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { Plus, CalendarRange, ShieldCheck, Wifi, WifiOff, RefreshCw, X } from 'lucide-react';
 import { useOfflineSync } from './src/lib/useOfflineSync';
+import { syncQueue } from './src/lib/syncQueue';
 import {
   fetchProducers,
   fetchVales,
@@ -469,19 +470,34 @@ const App: React.FC = () => {
 
       // Guardas Inteligentes: Si el servidor retorna datos, los tomamos. 
       // Para tablas críticas como Tanques/Tolvas, si retorna vacío ignoramos para no borrar el layout local por defecto.
-      if (p) setProducers(p); // Los productores si pueden ser []
-      if (v) setVales(v);
+      // --- LÓGICA DE FUSIÓN (MERGE) PARA EVITAR BORRADOS ---
+      const getMergedState = <T extends { id: string } | { id_vale: number }>(serverItems: any[], localItems: any[], opType: string) => {
+        const queueOps = syncQueue.get().filter(op => op.type === opType);
+        const pendingIds = new Set(queueOps.map(op => op.payload.id || op.payload.id_vale));
+        const pendingLocally = localItems.filter(item => pendingIds.has(item.id || item.id_vale));
+        const serverIds = new Set(serverItems.map(item => item.id || item.id_vale));
+        return [...serverItems, ...pendingLocally.filter(item => !serverIds.has(item.id || item.id_vale))];
+      };
+
+      if (p) setProducers(prev => getMergedState(p, prev, 'upsertProducer'));
+      if (v) setVales(prev => {
+        const queueOps = syncQueue.get().filter(op => op.type === 'upsertVale');
+        const pendingIds = new Set(queueOps.map(op => op.payload.id));
+        const pendingLocally = prev.filter(item => pendingIds.has(item.id));
+        const serverIds = new Set(v.map(item => item.id));
+        return [...v, ...pendingLocally.filter(item => !serverIds.has(item.id))];
+      });
       if (t && t.length > 0) setTanks(t);
       if (h && h.length > 0) setHoppers(h);
-      if (m) setMillingLots(m);
-      if (c) setCustomers(c);
-      if (pl) setProductionLots(pl);
-      if (pk) setPackagingLots(pk);
-      if (om) setOilMovements(om);
-      if (so) setSalesOrders(so);
-      if (pe) setPomaceExits(pe);
-      if (ae) setAuxEntries(ae);
-      if (oe) setOilExits(oe);
+      if (m) setMillingLots(prev => getMergedState(m, prev, 'upsertMillingLot'));
+      if (c) setCustomers(prev => getMergedState(c, prev, 'upsertCustomer'));
+      if (pl) setProductionLots(prev => getMergedState(pl, prev, 'upsertProductionLot'));
+      if (pk) setPackagingLots(prev => getMergedState(pk, prev, 'upsertPackagingLot'));
+      if (om) setOilMovements(prev => getMergedState(om, prev, 'upsertOilMovement'));
+      if (so) setSalesOrders(prev => getMergedState(so, prev, 'upsertSalesOrder'));
+      if (pe) setPomaceExits(prev => getMergedState(pe, prev, 'upsertPomaceExit'));
+      if (ae) setAuxEntries(prev => getMergedState(ae, prev, 'upsertAuxEntry'));
+      if (oe) setOilExits(prev => getMergedState(oe, prev, 'upsertOilExit'));
       if (nt) setNurseTank(nt);
 
       console.log("Carga de datos transaccionales completada");
@@ -840,9 +856,22 @@ const App: React.FC = () => {
                   </div>
 
                   {pendingCount > 0 && (
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest animate-pulse">
+                    <div className="flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-md bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest animate-pulse">
                       <RefreshCw size={10} className={isSyncing ? 'animate-spin' : ''} />
                       {pendingCount} Pendientes
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm("¿Seguro que quieres limpiar la cola de espera? Se perderán las cosas que no se hayan subido.")) {
+                            syncQueue.clear();
+                            window.location.reload();
+                          }
+                        }}
+                        className="ml-2 hover:bg-white/20 p-0.5 rounded"
+                        title="Limpiar cola"
+                      >
+                        <X size={10} />
+                      </button>
                     </div>
                   )}
 

@@ -79,7 +79,11 @@ export const fetchProducers = async (almazaraId?: string): Promise<Producer[]> =
         almazaraId: p.almazara_id,
         name: p.name,
         nif: p.nif,
-        municipality: '',
+        municipality: p.municipality || '',
+        province: p.province || '',
+        address: p.address || '',
+        email: p.email || '',
+        phone: p.phone || '',
         totalKgDelivered: Number(p.total_kg_delivered),
         status: p.status as ProducerStatus
     }));
@@ -92,7 +96,12 @@ export const upsertProducer = async (producer: Producer, skipQueue = false) => {
             almazara_id: producer.almazaraId || ALMAZARA_ID,
             name: producer.name,
             nif: producer.nif,
-            total_kg_delivered: producer.totalKgDelivered,
+            municipality: producer.municipality || '',
+            province: producer.province || '',
+            address: producer.address || '',
+            email: producer.email || '',
+            phone: producer.phone || '',
+            total_kg_delivered: producer.totalKgDelivered || 0,
             status: producer.status
         });
         return { error };

@@ -40,14 +40,19 @@ export const useOfflineSync = () => {
             try {
                 const fn = (api as any)[op.type];
                 if (typeof fn === 'function') {
-                    // Intentar la operación de nuevo
+                    console.log(`Intentando sincronizar ${op.type} (${op.id})...`);
                     const { error } = await fn(op.payload, true);
                     if (!error) {
+                        console.log(`Sincronización exitosa: ${op.type}`);
                         syncQueue.remove(op.id);
                         setPendingCount(prev => prev - 1);
                     } else {
-                        console.error(`Error re-sincronizando ${op.type}:`, error);
-                        // Si hay un error real de base de datos (no de red), paramos para no perder orden
+                        console.error(`Error de Supabase en ${op.type}:`, error.message, error.details);
+                        // Si es un error de red, paramos. Si es un error de datos (400, 409...), seguimos con el siguiente.
+                        if (error.status >= 400 && error.status < 500) {
+                            console.warn("Error de validación detectado. Continuando con el resto de la cola.");
+                            continue;
+                        }
                         break;
                     }
                 }
