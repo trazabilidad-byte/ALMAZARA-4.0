@@ -828,9 +828,10 @@ const App: React.FC = () => {
                   {String(NAV_ITEMS.find(n => n.id === activeTab)?.label || 'Panel de Control')}
                 </h1>
               </div>
-              <button onClick={handleRegisterClick} className="flex items-center justify-center gap-2 bg-[#111111] text-white px-7 py-4 rounded-3xl font-black text-sm shadow-xl border-b-4 border-[#D9FF66] uppercase">
-                <Plus size={18} /> Nuevo Registro
-              </button>
+              {currentUser?.role !== UserRole.VIEWER && !['dashboard', 'config', 'cellar', 'packaging', 'auxiliary', 'sales', 'analytics', 'traceability', 'direct_sales', 'milling'].includes(activeTab) && (
+                <button onClick={handleRegisterClick} className="flex items-center justify-center gap-2 bg-[#111111] text-white px-7 py-4 rounded-3xl font-black text-sm shadow-xl border-b-4 border-[#D9FF66] uppercase">
+                  <Plus size={18} /> Nuevo Registro
+                </button>
               )}
 
               {/* ID Visible en Móvil/Tablet */}
