@@ -11,24 +11,6 @@ interface AuthScreenProps {
    almazaraId: string;
 }
 
-const getUnifiedAlmazaraId = (email: string, originalId: string) => {
-   // LISTA BLANCA DE CORREOS QUE DEBEN COMPARTIR LA MISMA ALMAZARA
-   const UNIFIED_EMAILS = [
-      'dennisdiazdiaz19@gmail.com',
-      'trazabilidadobeoliva@gmail.com',
-      'dennisdiazdiaz@gmail.com'
-   ];
-
-   // ID MAESTRO FIJO PARA ESTOS USUARIOS
-   const MASTER_TENANT_ID = '34f0e636-681b-4b10-9017-02e5ca056c01';
-
-   if (UNIFIED_EMAILS.some(e => email.toLowerCase().includes(e.toLowerCase().split('@')[0]))) {
-      console.log('🔄 Unificando ID de Almazara para admin:', email);
-      return MASTER_TENANT_ID;
-   }
-   return originalId;
-};
-
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, authorizedUsers, almazaraId }) => {
    const [email, setEmail] = useState('');
    const [password, setPassword] = useState('');
@@ -52,7 +34,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, authorizedUsers
                email: localUser.email,
                fullName: localUser.name,
                role: localUser.role,
-               almazaraId: getUnifiedAlmazaraId(email, almazaraId) // <--- FORZAR ID AQUÍ
+               almazaraId: almazaraId
             });
             return;
          }
@@ -66,24 +48,22 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, authorizedUsers
             const { data: profile, error: profileError } = await getUserProfile(data.user.id);
 
             if (profileError || !profile) {
-               // Usuario sin perfil en app_users -> Asignar ID basado en email o default
-               const forcedId = getUnifiedAlmazaraId(email, 'unknown');
+               // Usuario sin perfil en app_users -> Asignar ID default
                onLogin({
                   id: data.user.id,
                   email: data.user.email,
                   fullName: 'Usuario',
                   role: UserRole.OPERATOR,
-                  almazaraId: forcedId
+                  almazaraId: 'unknown'
                });
             } else {
-               // Usuario con perfil -> Verificar si necesita unificación
-               const finalId = getUnifiedAlmazaraId(profile.email, profile.almazara_id);
+               // Usuario con perfil -> Usar su almazara_id real
                onLogin({
                   id: profile.id,
                   email: profile.email,
                   fullName: profile.full_name,
                   role: profile.role as UserRole,
-                  almazaraId: finalId
+                  almazaraId: profile.almazara_id
                });
             }
          }
