@@ -108,6 +108,8 @@ export interface Customer {
   address: string;
   phone?: string;
   email?: string;
+  province?: string;
+  zipCode?: string;
   type: CustomerType;
   status: CustomerStatus;
 }
@@ -199,6 +201,7 @@ export interface MillingLot {
   variedad: OliveVariety;
   vales_ids: number[];
   campaign?: string; // Nuevo para histórico
+  status?: string;
 }
 
 // NUEVO: LOTE DE PRODUCCIÓN (TANDA DIARIA)

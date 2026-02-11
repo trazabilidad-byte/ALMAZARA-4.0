@@ -83,11 +83,12 @@ export const fetchProducers = async (almazaraId?: string): Promise<Producer[]> =
         nif: p.nif,
         municipality: p.municipality || '',
         province: p.province || '',
+        zipCode: p.zip_code || '',
         address: p.address || '',
         email: p.email || '',
         phone: p.phone || '',
         totalKgDelivered: Number(p.total_kg_delivered),
-        status: p.status as ProducerStatus
+        status: (p.status?.toUpperCase() === 'ACTIVE' ? 'ACTIVE' : 'ARCHIVED') as ProducerStatus
     }));
 };
 
@@ -98,11 +99,12 @@ export const upsertProducer = async (producer: Producer, skipQueue = false) => {
             almazara_id: producer.almazaraId || ALMAZARA_ID,
             name: producer.name,
             nif: producer.nif,
-            municipality: producer.municipality || '',
-            province: producer.province || '',
-            address: producer.address || '',
-            email: producer.email || '',
-            phone: producer.phone || '',
+            municipality: producer.municipality,
+            province: producer.province,
+            zip_code: producer.zipCode,
+            address: producer.address,
+            email: producer.email,
+            phone: producer.phone,
             total_kg_delivered: producer.totalKgDelivered || 0,
             status: producer.status
         });
@@ -127,12 +129,12 @@ export const fetchVales = async (almazaraId?: string): Promise<Vale[]> => {
         id_vale: v.sequential_id,
         id: v.id,
         almazaraId: v.almazara_id,
-        tipo_vale: v.type as any,
+        tipo_vale: (v.type === 'A_MOLTURACION' ? 'Para Molturar' : 'Venta Directa') as any,
         productor_id: v.producer_id,
-        productor_name: '',
-        parcela: '',
+        productor_name: v.producer_name || '',
+        parcela: v.parcela || '',
         fecha_entrada: v.date,
-        variedad: 'Picual' as any,
+        variedad: v.variety as any,
         kilos_brutos: Number(v.weight_kg),
         impurezas_kg: 0,
         kilos_netos: Number(v.weight_kg),
@@ -143,7 +145,8 @@ export const fetchVales = async (almazaraId?: string): Promise<Vale[]> => {
         analitica: {
             rendimiento_graso: Number(v.fat_percentage),
             acidez: Number(v.acidity)
-        }
+        },
+        campaign: v.campaign
     })) as Vale[];
 };
 
@@ -155,10 +158,13 @@ export const upsertVale = async (vale: Vale, skipQueue = false) => {
             sequential_id: vale.id_vale,
             type: vale.tipo_vale === 'Para Molturar' ? 'A_MOLTURACION' : 'B_VENTA_DIRECTA',
             producer_id: vale.productor_id,
+            producer_name: vale.productor_name,
+            parcela: vale.parcela,
             weight_kg: vale.kilos_netos,
             fat_percentage: vale.analitica.rendimiento_graso,
             acidez: vale.analitica.acidez,
             date: vale.fecha_entrada,
+            variety: vale.variedad,
             status: vale.estado as any,
             milling_lot_id: vale.milling_lot_id,
             campaign: vale.campaign
@@ -319,7 +325,7 @@ export const fetchMillingLots = async (almazaraId?: string): Promise<MillingLot[
         kilos_aceite_esperado: Number(l.theoretical_oil_kg),
         kilos_aceite_real: Number(l.industrial_oil_kg),
         deposito_id: 1,
-        variedad: 'Picual' as any,
+        variedad: (l.variety || 'Picual') as any,
         vales_ids: [],
         campaign: l.campaign
     }));
@@ -335,8 +341,9 @@ export const upsertMillingLot = async (lot: MillingLot, skipQueue = false) => {
             total_olives_kg: lot.kilos_aceituna,
             theoretical_oil_kg: lot.kilos_aceite_esperado,
             industrial_oil_kg: lot.kilos_aceite_real,
+            variety: lot.variedad,
             campaign: lot.campaign,
-            status: 'ACTIVE'
+            status: lot.status || 'ACTIVE'
         });
         return { error };
     }, skipQueue);
@@ -350,6 +357,8 @@ export const upsertCustomer = async (customer: Customer, skipQueue = false) => {
             name: customer.name,
             cif: customer.cif,
             address: customer.address,
+            province: customer.province,
+            zip_code: customer.zipCode,
             phone: customer.phone,
             email: customer.email,
             type: customer.type as any,
@@ -378,10 +387,12 @@ export const fetchCustomers = async (almazaraId?: string): Promise<Customer[]> =
         name: c.name,
         cif: c.cif,
         address: c.address,
+        province: c.province || '',
+        zipCode: c.zip_code || '',
         phone: c.phone,
         email: c.email,
         type: c.type as any,
-        status: c.status === 'ACTIVE' ? CustomerStatus.ACTIVE : CustomerStatus.ARCHIVED
+        status: (c.status === 'ACTIVE' || c.status === 'Activo' ? CustomerStatus.ACTIVE : CustomerStatus.ARCHIVED)
     }));
 };
 
