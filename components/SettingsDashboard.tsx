@@ -1234,95 +1234,113 @@ export const SettingsDashboard: React.FC<SettingsDashboardProps> = ({
                                 <Download size={18} /> Descargar Informe CSV
                             </button>
                         </div>
+
+
+                        <div className="bg-[#111111] text-white p-6 rounded-[32px] mt-6 border border-gray-800">
+                            <h4 className="font-bold text-red-400 mb-2 uppercase text-xs tracking-widest">Zona de Peligro / Debug</h4>
+                            <p className="text-xs text-gray-400 mb-4">Si tienes problemas de sincronización (cola atascada), usa este botón.</p>
+                            <button
+                                onClick={() => {
+                                    localStorage.removeItem('almazara_sync_queue');
+                                    window.location.reload();
+                                }}
+                                className="w-full py-3 bg-red-900/30 hover:bg-red-900/50 text-red-200 border border-red-900/50 rounded-xl font-bold uppercase text-xs tracking-widest transition-all"
+                            >
+                                Limpiar Cola de Sincronización
+                            </button>
+                        </div>
                     </div>
                 )}
 
-            </div>
 
-            {showArchiveModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[40px] w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in duration-300">
-                        <div className="p-8 border-b border-gray-100 bg-[#F9FAF9]">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">CAMBIO DE CICLO</p>
-                                    <h3 className="text-2xl font-black text-[#111111] uppercase tracking-tighter">
-                                        {config.currentCampaign ? 'Cerrar Campaña' : 'Empezar Nueva Campaña'}
-                                    </h3>
+
+                {
+                    showArchiveModal && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+                            <div className="bg-white rounded-[40px] w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in duration-300">
+                                <div className="p-8 border-b border-gray-100 bg-[#F9FAF9]">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">CAMBIO DE CICLO</p>
+                                            <h3 className="text-2xl font-black text-[#111111] uppercase tracking-tighter">
+                                                {config.currentCampaign ? 'Cerrar Campaña' : 'Empezar Nueva Campaña'}
+                                            </h3>
+                                        </div>
+                                        <button onClick={() => setShowArchiveModal(false)} className="p-2 hover:bg-white rounded-full transition-colors"><X size={24} /></button>
+                                    </div>
                                 </div>
-                                <button onClick={() => setShowArchiveModal(false)} className="p-2 hover:bg-white rounded-full transition-colors"><X size={24} /></button>
+
+                                <form onSubmit={config.currentCampaign ? handleArchiveSubmit : handleStartPreCheck} className="p-8 space-y-6">
+                                    {!config.currentCampaign ? (
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre Nueva Campaña</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                placeholder="Ej: 2026/2027"
+                                                value={archiveForm.nextCampaign}
+                                                onChange={e => setArchiveForm({ ...archiveForm, nextCampaign: e.target.value })}
+                                                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-[#111111] outline-none focus:border-black transition-all shadow-sm"
+                                            />
+                                            <p className="text-[10px] text-gray-400 mt-2 px-1">Esto reseteará las transacciones diarias pero mantendrá tus productores y clientes.</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="space-y-2 bg-amber-50 p-5 rounded-2xl border border-amber-200">
+                                                <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">⚠️ Importante</p>
+                                                <p className="text-xs text-amber-800 leading-relaxed">
+                                                    Al cerrar esta campaña, se <strong>reseteará todo a cero</strong>: depósitos, lotes, ventas, y envasado. Los datos se archivarán y podrás generar el PDF de trazabilidad desde "Campañas Archivadas".
+                                                </p>
+                                                <p className="text-[10px] text-amber-600 mt-2">
+                                                    ✅ Se conservan: Productores, Clientes, Configuración, Usuarios
+                                                </p>
+                                            </div>
+
+                                            {/* BOTÓN PARA GENERAR PDF ANTES DE CERRAR */}
+                                            <div className="space-y-3 bg-blue-50 p-5 rounded-2xl border border-blue-200">
+                                                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">📄 Paso 1: Generar PDF</p>
+                                                <p className="text-xs text-blue-800 leading-relaxed mb-3">
+                                                    <strong>Genera el PDF primero</strong> y verifica que contenga todos los datos correctamente. Solo después de verificarlo, confirma el cierre de campaña.
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => generateCampaignPDF(config.currentCampaign)}
+                                                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase text-xs tracking-widest transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <Download size={16} />
+                                                    Generar y Descargar PDF de Campaña
+                                                </button>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-red-500 uppercase tracking-widest ml-1">Confirmación de Seguridad</label>
+                                                <input
+                                                    type="text"
+                                                    required
+                                                    placeholder='Escribe "ARCHIVAR" para confirmar'
+                                                    value={archiveForm.confirmText}
+                                                    onChange={e => setArchiveForm({ ...archiveForm, confirmText: e.target.value })}
+                                                    className="w-full bg-white border-2 border-red-100 focus:border-red-500 rounded-xl px-4 py-3 text-sm font-bold text-red-600 outline-none placeholder:text-red-200 transition-all"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <button
+                                        type="submit"
+                                        disabled={config.currentCampaign ? (archiveForm.confirmText !== 'ARCHIVAR') : !archiveForm.nextCampaign}
+                                        className="w-full py-4 bg-[#111111] disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-[24px] font-black uppercase text-xs tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
+                                    >
+                                        {config.currentCampaign ? 'Confirmar Cierre y Archivar' : 'Abrir Nueva Campaña'}
+                                    </button>
+                                </form>
                             </div>
                         </div>
-
-                        <form onSubmit={config.currentCampaign ? handleArchiveSubmit : handleStartPreCheck} className="p-8 space-y-6">
-                            {!config.currentCampaign ? (
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre Nueva Campaña</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        placeholder="Ej: 2026/2027"
-                                        value={archiveForm.nextCampaign}
-                                        onChange={e => setArchiveForm({ ...archiveForm, nextCampaign: e.target.value })}
-                                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-[#111111] outline-none focus:border-black transition-all shadow-sm"
-                                    />
-                                    <p className="text-[10px] text-gray-400 mt-2 px-1">Esto reseteará las transacciones diarias pero mantendrá tus productores y clientes.</p>
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="space-y-2 bg-amber-50 p-5 rounded-2xl border border-amber-200">
-                                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">⚠️ Importante</p>
-                                        <p className="text-xs text-amber-800 leading-relaxed">
-                                            Al cerrar esta campaña, se <strong>reseteará todo a cero</strong>: depósitos, lotes, ventas, y envasado. Los datos se archivarán y podrás generar el PDF de trazabilidad desde "Campañas Archivadas".
-                                        </p>
-                                        <p className="text-[10px] text-amber-600 mt-2">
-                                            ✅ Se conservan: Productores, Clientes, Configuración, Usuarios
-                                        </p>
-                                    </div>
-
-                                    {/* BOTÓN PARA GENERAR PDF ANTES DE CERRAR */}
-                                    <div className="space-y-3 bg-blue-50 p-5 rounded-2xl border border-blue-200">
-                                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">📄 Paso 1: Generar PDF</p>
-                                        <p className="text-xs text-blue-800 leading-relaxed mb-3">
-                                            <strong>Genera el PDF primero</strong> y verifica que contenga todos los datos correctamente. Solo después de verificarlo, confirma el cierre de campaña.
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={() => generateCampaignPDF(config.currentCampaign)}
-                                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase text-xs tracking-widest transition-all flex items-center justify-center gap-2"
-                                        >
-                                            <Download size={16} />
-                                            Generar y Descargar PDF de Campaña
-                                        </button>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-red-500 uppercase tracking-widest ml-1">Confirmación de Seguridad</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            placeholder='Escribe "ARCHIVAR" para confirmar'
-                                            value={archiveForm.confirmText}
-                                            onChange={e => setArchiveForm({ ...archiveForm, confirmText: e.target.value })}
-                                            className="w-full bg-white border-2 border-red-100 focus:border-red-500 rounded-xl px-4 py-3 text-sm font-bold text-red-600 outline-none placeholder:text-red-200 transition-all"
-                                        />
-                                    </div>
-                                </>
-                            )}
-
-                            <button
-                                type="submit"
-                                disabled={config.currentCampaign ? (archiveForm.confirmText !== 'ARCHIVAR') : !archiveForm.nextCampaign}
-                                className="w-full py-4 bg-[#111111] disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-[24px] font-black uppercase text-xs tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
-                            >
-                                {config.currentCampaign ? 'Confirmar Cierre y Archivar' : 'Abrir Nueva Campaña'}
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            )}
+                    )
+                }
 
 
+            </div>
         </div>
     );
 };

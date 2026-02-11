@@ -419,6 +419,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (isLoggedIn && currentUser) {
       console.log("Cargando datos reales de Supabase para Almazara:", currentUser.almazaraId);
+      setSyncAlmazaraId(currentUser.almazaraId);
 
       const loadData = async () => {
         try {

@@ -41,7 +41,7 @@ export const useOfflineSync = () => {
                 const fn = (api as any)[op.type];
                 if (typeof fn === 'function') {
                     // Intentar la operación de nuevo
-                    const { error } = await fn(op.payload);
+                    const { error } = await fn(op.payload, true);
                     if (!error) {
                         syncQueue.remove(op.id);
                         setPendingCount(prev => prev - 1);
