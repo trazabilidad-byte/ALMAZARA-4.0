@@ -130,7 +130,15 @@ const App: React.FC = () => {
   const getPersistedState = <T,>(key: string, defaultValue: T): T => {
     try {
       const saved = localStorage.getItem(key);
-      return saved ? JSON.parse(saved) : defaultValue;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Si es un objeto (no array), fusionar con defaultValue para asegurar que existan los nuevos campos
+        if (typeof defaultValue === 'object' && defaultValue !== null && !Array.isArray(defaultValue)) {
+          return { ...defaultValue, ...parsed };
+        }
+        return parsed;
+      }
+      return defaultValue;
     } catch (e) {
       console.error(`Error loading ${key}`, e);
       return defaultValue;

@@ -904,7 +904,7 @@ export const SettingsDashboard: React.FC<SettingsDashboardProps> = ({
                             <div className="space-y-4">
                                 <h3 className="text-sm font-black uppercase flex items-center gap-2"><LayoutDashboard size={16} /> Widgets del Dashboard</h3>
                                 <div className="space-y-2">
-                                    {formConfig.dashboardWidgets.map(widget => (
+                                    {formConfig.dashboardWidgets?.map(widget => (
                                         <div key={widget.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                                             <span className="text-xs font-bold text-gray-600">{WIDGET_NAMES[widget.id] || widget.id}</span>
                                             <button
@@ -922,7 +922,7 @@ export const SettingsDashboard: React.FC<SettingsDashboardProps> = ({
                             <div className="space-y-4">
                                 <h3 className="text-sm font-black uppercase flex items-center gap-2"><Menu size={16} /> Menú Lateral</h3>
                                 <div className="space-y-2">
-                                    {formConfig.sidebarConfig.map(item => {
+                                    {formConfig.sidebarConfig?.map(item => {
                                         const navItem = NAV_ITEMS.find(n => n.id === item.id);
                                         return (
                                             <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
@@ -1147,7 +1147,7 @@ export const SettingsDashboard: React.FC<SettingsDashboardProps> = ({
                                         <button onClick={handleAddFormat} className="bg-black text-white p-2 rounded-lg"><Plus size={16} /></button>
                                     </div>
                                     <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-                                        {formConfig.packagingFormats.map(fmt => (
+                                        {formConfig.packagingFormats?.map(fmt => (
                                             <div key={fmt.id} className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100 group hover:border-gray-300">
                                                 <span className="text-xs font-bold text-black">{fmt.name} ({fmt.capacityLiters} L)</span>
                                                 <button onClick={() => handleRemoveFormat(fmt.id)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
