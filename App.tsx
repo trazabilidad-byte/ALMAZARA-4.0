@@ -436,9 +436,9 @@ const App: React.FC = () => {
       (old.id_vale === v.id_vale && old.almazaraId === vAlmazaraId)
     );
 
-    // 2. RECUPERAR NOMBRES SI FALTAN:
-    const prodName = v.productor_name || producers.find(p => p.id === v.productor_id)?.name || '';
-    const compName = v.comprador_name || (v.comprador ? customers.find(c => c.id === v.comprador)?.name : '') || '';
+    // 2. RECUPERAR NOMBRES SI FALTAN (Protección contra desaparición):
+    const prodName = v.productor_name || producers.find(p => p.id === v.productor_id)?.name || existing?.productor_name || '';
+    const compName = v.comprador_name || (v.comprador ? customers.find(c => c.id === v.comprador)?.name : '') || existing?.comprador_name || '';
 
     // 3. PREPARAR OBJETO PARA GUARDAR:
     const valeToSave: Vale = {
@@ -451,14 +451,20 @@ const App: React.FC = () => {
     };
 
     // 3. ACTUALIZACIÓN LOCAL:
+    // 4. ACTUALIZACIÓN LOCAL CON DEDUPLICACIÓN PROACTIVA:
     setVales(prev => {
-      const index = prev.findIndex(v => v.id === valeToSave.id);
+      // Eliminamos cualquier duplicado previo del mismo número de vale pero con diferente ID
+      const filtered = prev.filter(old =>
+        !(old.id_vale === valeToSave.id_vale && old.almazaraId === valeToSave.almazaraId && old.id !== valeToSave.id)
+      );
+
+      const index = filtered.findIndex(v => v.id === valeToSave.id);
       if (index !== -1) {
-        const newVales = [...prev];
+        const newVales = [...filtered];
         newVales[index] = valeToSave;
         return newVales;
       }
-      return [valeToSave, ...prev];
+      return [valeToSave, ...filtered];
     });
 
     try {
@@ -602,7 +608,24 @@ const App: React.FC = () => {
         const pendingIds = new Set(queueOps.map(op => op.payload.id));
         const pendingLocally = prev.filter(item => pendingIds.has(item.id));
         const serverIds = new Set(v.map(item => item.id));
-        return [...v, ...pendingLocally.filter(item => !serverIds.has(item.id))];
+
+        // Combinamos servidor + locales pendientes
+        const combined = [...v, ...pendingLocally.filter(item => !serverIds.has(item.id))];
+
+        // Deduplicamos por id_vale (Sequential ID) para evitar visualización doble
+        // Damos prioridad a los que tienen cambios pendientes localmente
+        const deduplicated = new Map<number, Vale>();
+
+        // 1. Cargamos todos
+        combined.forEach(item => {
+          const existing = deduplicated.get(item.id_vale);
+          // Si no existe, o si el nuevo está en la cola de pendientes, lo preferimos
+          if (!existing || pendingIds.has(item.id)) {
+            deduplicated.set(item.id_vale, item);
+          }
+        });
+
+        return Array.from(deduplicated.values());
       });
       if (t) setTanks(t);
       if (h) setHoppers(h);

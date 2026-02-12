@@ -159,7 +159,7 @@ export const ValesList: React.FC<ValesListProps> = ({ vales, onEdit, onView, onV
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredVales.map((v) => (
-                <tr key={v.id_vale} className="hover:bg-[#F4F7F4]/30 transition-colors group">
+                <tr key={v.id} className="hover:bg-[#F4F7F4]/30 transition-colors group">
                   <td className="px-6 py-5">
                     <button
                       onClick={() => onView(v)}
@@ -197,7 +197,7 @@ export const ValesList: React.FC<ValesListProps> = ({ vales, onEdit, onView, onV
                   </td>
                   <td className="px-6 py-5 text-center">
                     <span className={`px-2 py-1 rounded-md text-[9px] font-black uppercase border inline-block whitespace-nowrap ${v.variedad === OliveVariety.PICUAL ? 'bg-green-50 text-green-700 border-green-100' :
-                        'bg-orange-50 text-orange-700 border-orange-100'
+                      'bg-orange-50 text-orange-700 border-orange-100'
                       }`}>
                       {v.variedad}
                     </span>

@@ -32,7 +32,8 @@ export const DirectSalesDashboard: React.FC<DirectSalesDashboardProps> = ({
   const filteredSales = useMemo(() => {
     return directSales.filter(sale => {
       const producerName = String(sale.productor_name || '').toLowerCase();
-      const customerName = String(customers.find(c => c.id === sale.comprador)?.name || '').toLowerCase();
+      const buyer = customers.find(c => c.id === sale.comprador);
+      const customerName = String(buyer?.name || sale.comprador_name || '').toLowerCase();
       const term = searchTerm.toLowerCase();
       return producerName.includes(term) || customerName.includes(term) || String(sale.id_vale).includes(term);
     });
@@ -141,7 +142,7 @@ export const DirectSalesDashboard: React.FC<DirectSalesDashboardProps> = ({
                 const buyer = customers.find(c => c.id === sale.comprador);
                 const seller = producers.find(p => p.id === sale.productor_id);
                 return (
-                  <tr key={sale.id_vale} className="hover:bg-[#F4F7F4] transition-colors group">
+                  <tr key={sale.id} className="hover:bg-[#F4F7F4] transition-colors group">
                     <td className="px-6 py-5">
                       <button onClick={() => onViewVale(sale)} className="text-left group-hover:scale-105 transition-transform">
                         <p className="text-sm font-black text-[#111111] underline decoration-dotted decoration-[#D9FF66] underline-offset-4">
