@@ -83,14 +83,32 @@ export const PackagingDashboard: React.FC<PackagingDashboardProps> = ({
     const nurseMaxLiters = nurseTank.maxCapacityKg / OIL_DENSITY;
     const nurseFreeLiters = nurseAvailableKg / OIL_DENSITY;
 
+    // --- OBTENER ENTRADAS A NODRIZA (PARA HISTORIAL) ---
+    const nurseEntries = useMemo(() => {
+        return oilMovements
+            .filter(m => m.target_tank_id === 999)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [oilMovements]);
+
     // --- LOTE ACTIVO DINÁMICO (HERENCIA) ---
     const currentPackagingBatchId = useMemo(() => {
         if (activeTab === 'filtered') {
-            return nurseTank.currentBatchId || null;
+            // PRIORIDAD 1: El lote asignado directamente a la nodriza (estado actual)
+            if (nurseTank.currentBatchId && nurseTank.currentKg > 0) {
+                return nurseTank.currentBatchId;
+            }
+
+            // PRIORIDAD 2: FALLBACK INTELIGENTE (Trazabilidad heredada)
+            // Si hay carga pero no hay ID, lo buscamos en el historial (oilMovements)
+            if (nurseTank.currentKg > 0 && nurseEntries.length > 0) {
+                return nurseEntries[0].batch_id || null;
+            }
+
+            return null;
         } else {
             return packHeader.sourceTankId ? `SF-D${packHeader.sourceTankId}-${new Date().getFullYear()}` : 'SELECCIONA_ORIGEN';
         }
-    }, [activeTab, nurseTank.currentBatchId, packHeader.sourceTankId]);
+    }, [activeTab, nurseTank.currentBatchId, nurseTank.currentKg, nurseEntries, packHeader.sourceTankId]);
 
     // --- CÁLCULO DE STOCK EN TIEMPO REAL (HISTÓRICO + SESIÓN ACTUAL) ---
     const liveAuxLots = useMemo(() => {
@@ -184,12 +202,6 @@ export const PackagingDashboard: React.FC<PackagingDashboardProps> = ({
         };
     }, [liveAuxLots, currentLine.format]);
 
-    // --- OBTENER ENTRADAS A NODRIZA (PARA HISTORIAL) ---
-    const nurseEntries = useMemo(() => {
-        return oilMovements
-            .filter(m => m.target_tank_id === 999)
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [oilMovements]);
 
 
     // --- HANDLERS ---
@@ -315,17 +327,16 @@ export const PackagingDashboard: React.FC<PackagingDashboardProps> = ({
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
             {/* TOP SECTION: DEPÓSITO NODRIZA + HISTORIAL */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
                 {/* CARD PRINCIPAL NODRIZA */}
-                <div className="lg:col-span-2 bg-[#111111] rounded-[32px] p-8 text-white relative overflow-hidden shadow-2xl flex flex-col justify-between min-h-[280px]">
-                    {/* ... (Contenido igual que antes) ... */}
+                <div className="md:col-span-1 lg:col-span-2 bg-[#111111] rounded-[32px] p-6 text-white relative overflow-hidden shadow-2xl flex flex-col gap-4 h-fit self-start">
                     <div className="relative z-10 flex justify-between items-start">
                         <div>
                             <div className="flex items-center gap-2 mb-1">
                                 <div className="p-1.5 bg-[#D9FF66] rounded-lg text-black"><Package size={16} /></div>
                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">DEPÓSITO NODRIZA (ENVASADORA)</span>
                             </div>
-                            <h2 className="text-4xl font-black text-[#D9FF66] tracking-tighter mb-4">CAPACIDAD: {Math.round(nurseMaxLiters).toLocaleString()} L</h2>
+                            <h2 className="text-xl md:text-2xl font-black text-[#D9FF66] tracking-tighter mb-2">CAPACIDAD: {Math.round(nurseMaxLiters).toLocaleString()} L</h2>
                         </div>
                         {nurseTank.lastEntryDate && (
                             <div className="text-right">
@@ -335,60 +346,61 @@ export const PackagingDashboard: React.FC<PackagingDashboardProps> = ({
                         )}
                     </div>
 
-                    <div className="relative z-10 bg-white p-4 rounded-xl mb-4 border border-gray-100">
+                    <div className="relative z-10 bg-white p-4 rounded-xl border border-gray-100">
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">ACEITE EN NODRIZA (LOTE ACTIVO)</p>
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <p className="text-xl font-black text-black uppercase">{nurseTank.currentBatchId || 'VACÍO'}</p>
+                        <div className="flex justify-between items-center gap-4">
+                            <div className="flex-1">
+                                <p className="text-xl md:text-2xl font-black text-black uppercase">{nurseTank.currentBatchId || 'VACÍO'}</p>
                                 <p className="text-[10px] font-bold text-gray-500 uppercase">
                                     Origen: {nurseTank.lastSourceTankId ? `Depósito ${nurseTank.lastSourceTankId}` : '---'}
                                 </p>
+
+                                {nurseTank.currentBatchId && nurseTank.currentKg > 0 && (
+                                    <div className="mt-2 flex items-center gap-2 bg-[#D9FF66] px-3 py-1.5 rounded-lg w-fit">
+                                        <Tag size={12} className="text-black" />
+                                        <p className="text-[10px] font-black text-[#000000] uppercase tracking-wide">
+                                            Etiquetando con Lote: {nurseTank.currentBatchId}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                             <div className="text-right">
-                                <p className="text-xl font-black text-black">{Math.round(nurseTank.currentKg).toLocaleString()} KG</p>
-                                <p className="text-[10px] font-bold text-gray-500 uppercase">Disponibles</p>
+                                <p className="text-xl md:text-2xl font-black text-black">{Math.round(nurseTank.currentKg).toLocaleString()} KG</p>
+                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Disponibles</p>
                             </div>
                         </div>
-
-                        {/* INDICADOR VISUAL DE VINCULACIÓN */}
-                        {nurseTank.currentBatchId && nurseTank.currentKg > 0 && (
-                            <div className="mt-3 flex items-center gap-2 bg-[#D9FF66] px-3 py-2 rounded-lg w-fit animate-in fade-in slide-in-from-left-2">
-                                <Tag size={14} className="text-black" />
-                                <p className="text-xs font-black text-[#000000] uppercase tracking-wide">
-                                    Etiquetando con Lote: {nurseTank.currentBatchId}
-                                </p>
-                            </div>
-                        )}
                     </div>
 
-                    <div className="relative z-10 grid grid-cols-2 gap-8 mt-2">
+                    <div className="relative z-10 grid grid-cols-2 gap-4 md:gap-8">
                         <div>
                             <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Actual (Litros)</p>
-                            <p className="text-2xl font-black text-[#D9FF66]">{Math.round(nurseCurrentLiters).toLocaleString()}</p>
+                            <p className="text-xl md:text-2xl font-black text-[#D9FF66]">{Math.round(nurseCurrentLiters).toLocaleString()}</p>
                         </div>
                         <div>
                             <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Espacio Libre (Litros)</p>
-                            <p className="text-2xl font-black text-gray-400">{Math.round(nurseFreeLiters).toLocaleString()}</p>
+                            <p className="text-xl md:text-2xl font-black text-gray-400">{Math.round(nurseFreeLiters).toLocaleString()}</p>
                         </div>
                     </div>
 
-                    <button
-                        onClick={() => setShowFillModal(true)}
-                        className="mt-6 w-full py-4 bg-[#D9FF66] text-black rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-[1.01] active:scale-95 transition-all shadow-lg shadow-[#D9FF66]/20 flex items-center justify-center gap-2"
-                    >
-                        <ArrowRight size={16} /> Recepcionar Aceite desde Bodega
-                    </button>
+                    <div className="relative z-10">
+                        <button
+                            onClick={() => setShowFillModal(true)}
+                            className="w-full py-4 bg-[#D9FF66] text-black rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-[1.01] active:scale-95 transition-all shadow-lg shadow-[#D9FF66]/20 flex items-center justify-center gap-2"
+                        >
+                            <ArrowRight size={16} /> Recepcionar Aceite desde Bodega
+                        </button>
+                    </div>
 
-                    <div className="absolute bottom-0 left-0 h-2 bg-gray-800 w-full">
+                    <div className="absolute bottom-0 left-0 h-1.5 bg-gray-800 w-full">
                         <div className="h-full bg-[#D9FF66] transition-all duration-1000" style={{ width: `${nurseFillPercent}%` }} />
                     </div>
                     <div className="absolute right-[-20px] top-[-20px] opacity-10 pointer-events-none">
-                        <Factory size={180} />
+                        <Factory size={150} />
                     </div>
                 </div>
 
                 {/* CARD LOTES ENTRADA NODRIZA (HISTORIAL) */}
-                <div className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-sm flex flex-col h-[600px] lg:h-auto overflow-hidden">
+                <div className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-sm flex flex-col max-h-[500px] h-fit overflow-hidden">
                     <div className="flex items-center gap-2 mb-6 pb-4 border-b border-gray-100">
                         <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Box size={18} /></div>
                         <h3 className="text-sm font-black text-[#000000] uppercase tracking-wide">Historial de Lotes de Entrada</h3>

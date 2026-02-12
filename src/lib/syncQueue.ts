@@ -22,7 +22,18 @@ export const syncQueue = {
     },
 
     add: (op: Omit<SyncOperation, 'id' | 'timestamp'>) => {
-        const queue = syncQueue.get();
+        let queue = syncQueue.get();
+
+        // DEDUPLICAR: Evita que operaciones antiguas sobreescriban a las nuevas
+        if (op.payload && (op.payload.id || op.payload.id_vale)) {
+            queue = queue.filter(item => {
+                if (item.type !== op.type) return true;
+                const matchId = op.payload.id && item.payload.id === op.payload.id;
+                const matchSeq = op.payload.id_vale && item.payload.id_vale === op.payload.id_vale;
+                return !(matchId || matchSeq);
+            });
+        }
+
         const newOp: SyncOperation = {
             ...op,
             id: crypto.randomUUID(),
@@ -30,7 +41,7 @@ export const syncQueue = {
         };
         queue.push(newOp);
         localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-        console.log(`Operación ${op.type} encolada offline`);
+        console.log(`Operación ${op.type} encolada offline (deduplicada)`);
     },
 
     remove: (id: string) => {

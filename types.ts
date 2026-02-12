@@ -240,6 +240,7 @@ export interface Vale {
     acidez: number;
   };
   campaign?: string; // Nuevo para histórico
+  comprador_name?: string; // Nombre desnormalizado para sincronización
 }
 
 // --- TIPOS NUEVOS PARA ENVASADORA ---

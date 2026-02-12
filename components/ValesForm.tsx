@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Producer, OliveVariety, ValeType, Vale, ValeStatus, Hopper, Customer, CustomerType, MillingLot, Tank, PackagingLot, OilExit, ExitType, ProductionLot, OilMovement } from '../types';
 import { Search, MapPin, Info, CheckCircle2, X, Factory, Percent, ChevronDown, Check, Calendar, UserCheck, RefreshCw, ShoppingCart, FlaskConical, Lock, AlertTriangle, ArrowRight, Building2, Map, Layers, FileText, Warehouse, Truck, Package, Activity, Calculator } from 'lucide-react';
+import { ALMAZARA_ID } from '../src/lib/supabaseSync';
 
 interface ValesFormProps {
     producers: Producer[];
@@ -63,12 +64,59 @@ export const ValesForm: React.FC<ValesFormProps> = ({
         variedad: editVale?.variedad || OliveVariety.PICUAL,
         ubicacion_id: editVale?.ubicacion_id || (hoppers.length > 0 ? hoppers[0].id : 1),
         uso_contador: editVale?.uso_contador || getInitialUsage(editVale?.ubicacion_id || (hoppers.length > 0 ? hoppers[0].id : 1)),
-        rendimiento_graso: editVale?.analitica.rendimiento_graso || 0,
-        acidez: editVale?.analitica.acidez || 0
+        rendimiento_graso: editVale?.analitica?.rendimiento_graso || 0,
+        acidez: editVale?.analitica?.acidez || 0
     });
 
+    const [originalIds, setOriginalIds] = useState({
+        id: editVale ? editVale.id : crypto.randomUUID(),
+        id_vale: editVale ? editVale.id_vale : lastValeId + 1,
+        almazaraId: editVale ? editVale.almazaraId : (ALMAZARA_ID || ''),
+        estado: editVale ? editVale.estado : ValeStatus.PENDIENTE,
+        milling_lot_id: editVale?.milling_lot_id,
+        campaign: editVale?.campaign
+    });
+
+    useEffect(() => {
+        if (editVale) {
+            setFormData({
+                tipo_vale: editVale.tipo_vale,
+                productor_id: editVale.productor_id,
+                parcela: editVale.parcela || '',
+                comprador: editVale.comprador || '',
+                fecha: new Date(editVale.fecha_entrada).toISOString().split('T')[0],
+                kilos_brutos: editVale.kilos_brutos,
+                impurezas_kg: editVale.impurezas_kg,
+                variedad: editVale.variedad,
+                ubicacion_id: editVale.ubicacion_id,
+                uso_contador: editVale.uso_contador,
+                rendimiento_graso: editVale.analitica?.rendimiento_graso || 0,
+                acidez: editVale.analitica?.acidez || 0
+            });
+            setOriginalIds({
+                id: editVale.id,
+                id_vale: editVale.id_vale,
+                almazaraId: editVale.almazaraId,
+                estado: editVale.estado,
+                milling_lot_id: editVale.milling_lot_id,
+                campaign: editVale.campaign
+            });
+            setSearchTerm(editVale.productor_name);
+
+            // BUSCAR NOMBRE DE COMPRADOR
+            const buyer = customers.find(c => c.id === editVale.comprador);
+            setCustomerSearchTerm(buyer?.name || editVale.comprador_name || '');
+        }
+    }, [editVale, customers]);
+
     const [searchTerm, setSearchTerm] = useState(editVale?.productor_name || '');
-    const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+    const [customerSearchTerm, setCustomerSearchTerm] = useState(() => {
+        if (editVale?.comprador) {
+            const buyer = customers.find(c => c.id === editVale.comprador);
+            if (buyer) return buyer.name;
+        }
+        return editVale?.comprador_name || '';
+    });
     const [showVarietyWarning, setShowVarietyWarning] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isVarietyOpen, setIsVarietyOpen] = useState(false);
@@ -78,7 +126,7 @@ export const ValesForm: React.FC<ValesFormProps> = ({
     const parcelRef = useRef<HTMLDivElement>(null);
 
     const isDirectSale = formData.tipo_vale === ValeType.VENTA_DIRECTA;
-    const displayId = editVale ? editVale.id_vale : (lastValeId + 1);
+    const displayId = originalIds.id_vale;
 
     // --- CÁLCULOS DE TRAZABILIDAD COMPLETA ---
     const traceInfo = useMemo(() => {
@@ -89,7 +137,7 @@ export const ValesForm: React.FC<ValesFormProps> = ({
             const buyer = customers.find(c => c.id === editVale.comprador);
             return {
                 isDirectSale: true,
-                buyerName: buyer?.name || editVale.comprador || 'Comprador Externo',
+                buyerName: buyer?.name || editVale.comprador_name || editVale.comprador || 'Comprador Externo',
                 millingBatch: null,
                 productionBatch: null,
                 tank: null,
@@ -252,13 +300,15 @@ export const ValesForm: React.FC<ValesFormProps> = ({
         setIsSubmitting(true);
         const producer = producers.find(p => p.id === formData.productor_id);
         const newVale: Vale = {
-            id_vale: editVale ? editVale.id_vale : lastValeId + 1,
-            almazaraId: editVale ? editVale.almazaraId : '',
+            id: originalIds.id,
+            id_vale: originalIds.id_vale,
+            almazaraId: originalIds.almazaraId || ALMAZARA_ID,
             tipo_vale: formData.tipo_vale,
             productor_id: formData.productor_id,
             productor_name: producer?.name || searchTerm || 'Desconocido',
             parcela: formData.parcela,
-            comprador: isDirectSale ? formData.comprador : undefined,
+            comprador: formData.comprador,
+            comprador_name: customerSearchTerm,
             fecha_entrada: new Date(formData.fecha).toISOString(),
             kilos_brutos: formData.kilos_brutos,
             impurezas_kg: formData.impurezas_kg,
@@ -266,8 +316,12 @@ export const ValesForm: React.FC<ValesFormProps> = ({
             variedad: formData.variedad,
             ubicacion_id: formData.ubicacion_id,
             uso_contador: formData.uso_contador,
-            estado: editVale ? editVale.estado : (isDirectSale ? ValeStatus.VENDIDO_DIRECTO : ValeStatus.PENDIENTE),
-            analitica: { rendimiento_graso: isDirectSale ? 0 : formData.rendimiento_graso, acidez: isDirectSale ? 0 : formData.acidez }
+            estado: originalIds.estado,
+            analitica: {
+                rendimiento_graso: Number(formData.rendimiento_graso),
+                acidez: Number(formData.acidez)
+            },
+            campaign: originalIds.campaign
         };
         setTimeout(() => { onSave(newVale); setIsSubmitting(false); }, 600);
     };

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Tank, MillingLot, Vale, Producer, OilMovement, OilExit, ExitType, ProductionLot, AppConfig } from '../types';
 import {
-    X, History, Factory, User, Truck, Package, Download, Lock, RefreshCw, Calculator, ArrowRight, CheckCircle2
+    X, History, Factory, User, Truck, Package, Download, Lock, RefreshCw, Calculator, ArrowRight, CheckCircle2, ChevronRight
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -242,26 +242,37 @@ export const TankPassport: React.FC<TankPassportProps> = ({
                                     const containedMTs = millingLots.filter(m => lp.millingLotsIds.includes(m.id));
                                     return (
                                         <div key={lp.id} className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                                            <div className="bg-gray-100 p-3 flex justify-between items-center cursor-pointer hover:bg-gray-200 transition-colors group" onClick={() => onViewProductionLot && onViewProductionLot(lp.id)}>
+                                            <div
+                                                className="bg-gray-100 p-3 flex justify-between items-center cursor-pointer hover:bg-gray-200 transition-colors group active:scale-[0.98] md:active:scale-100 touch-manipulation"
+                                                onClick={() => onViewProductionLot && onViewProductionLot(lp.id)}
+                                            >
                                                 <div className="flex items-center gap-3">
                                                     <div className="bg-[#111111] text-white p-1.5 rounded-md"><Calculator size={14} /></div>
                                                     <div>
-                                                        <p className="text-xs font-black text-[#111111] uppercase group-hover:text-blue-600 transition-colors underline-offset-2 group-hover:underline">{lp.id}</p>
+                                                        <p className="text-xs font-black text-[#111111] uppercase group-hover:text-blue-600 transition-colors underline underline-offset-2 decoration-2 decoration-transparent group-hover:decoration-blue-400">{lp.id}</p>
                                                         <p className="text-[9px] text-gray-500 font-bold">{new Date(lp.fecha).toLocaleDateString()}</p>
                                                     </div>
                                                 </div>
-                                                <span className="text-sm font-black text-[#111111]">{lp.totalRealOilKg.toLocaleString()} kg</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-black text-[#111111]">{lp.totalRealOilKg.toLocaleString()} kg</span>
+                                                    <ChevronRight size={14} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
+                                                </div>
                                             </div>
                                             <div className="bg-white p-3 space-y-3">
                                                 {containedMTs.map(mt => (
                                                     <div key={mt.id} className="pl-4 border-l-2 border-gray-100">
                                                         <div className="flex justify-between items-center mb-1">
-                                                            <p className="text-[10px] font-black text-gray-600 uppercase flex items-center gap-1">Lote MT: <span className="text-[#111111]">{mt.id}</span></p>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); if (onViewLot) onViewLot(mt.id); }}
+                                                                className="text-[10px] font-black text-gray-600 uppercase flex items-center gap-1 hover:text-blue-600 transition-colors bg-transparent border-0 p-0 cursor-pointer"
+                                                            >
+                                                                Lote MT: <span className="text-[#111111] underline underline-offset-2 decoration-gray-300 hover:decoration-blue-400">{mt.id}</span>
+                                                            </button>
                                                             <span className="text-[10px] font-bold text-[#111111]">{Math.round(mt.kilos_aceite_real).toLocaleString()} kg</span>
                                                         </div>
                                                         <div className="flex flex-wrap gap-1 mt-1">
                                                             {mt.vales_ids.map(vid => (
-                                                                <button key={vid} onClick={(e) => { e.stopPropagation(); const v = vales.find(x => x.id_vale === vid); if (v && onViewVale) onViewVale(v); }} className="text-[9px] font-bold bg-white text-[#111111] border border-gray-300 px-1.5 py-0.5 rounded hover:bg-black hover:text-[#D9FF66] transition-colors">#{vid}</button>
+                                                                <button key={vid} onClick={(e) => { e.stopPropagation(); const v = vales.find(x => x.id_vale === vid); if (v && onViewVale) onViewVale(v); }} className="text-[9px] font-bold bg-white text-[#111111] border border-gray-300 px-2 py-1 rounded hover:bg-black hover:text-[#D9FF66] transition-colors active:scale-90">#{vid}</button>
                                                             ))}
                                                         </div>
                                                     </div>

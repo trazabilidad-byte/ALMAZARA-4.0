@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { Producer, Vale, MillingLot, AppConfig, Tank, Hopper, UserRole, ProducerStatus, ValeStatus, OliveVariety, Customer, ProductionLot, PackagingLot, OilMovement, SalesOrder, PomaceExit, AuxEntry, CustomerStatus, OilExit, NurseTank } from '../../types';
+import { Producer, Vale, MillingLot, AppConfig, Tank, Hopper, UserRole, ProducerStatus, ValeStatus, OliveVariety, Customer, ProductionLot, PackagingLot, OilMovement, SalesOrder, PomaceExit, AuxEntry, CustomerStatus, OilExit, NurseTank, FinishedProduct, ValeType } from '../../types';
 import { syncQueue } from './syncQueue';
 
 export let ALMAZARA_ID = import.meta.env.VITE_ALMAZARA_ID || '';
@@ -53,7 +53,7 @@ export const fetchAppConfig = async (almazaraId?: string): Promise<AppConfig | n
 export const upsertAppConfig = async (config: AppConfig, skipQueue = false) => {
     return wrapUpsert('upsertAppConfig', config, async () => {
         const { error } = await supabase.from('app_configs').upsert({
-            almazara_id: ALMAZARA_ID,
+            almazara_id: config.almazaraId || ALMAZARA_ID,
             config: config,
             updated_at: new Date().toISOString()
         });
@@ -159,6 +159,8 @@ export const fetchVales = async (almazaraId?: string): Promise<Vale[]> => {
             rendimiento_graso: Number(v.fat_percentage),
             acidez: Number(v.acidity)
         },
+        comprador: v.customer_id, // Mapeamos el cliente
+        comprador_name: v.customer_name,
         campaign: v.campaign
     })) as Vale[];
 };
@@ -169,18 +171,21 @@ export const upsertVale = async (vale: Vale, skipQueue = false) => {
             id: vale.id,
             almazara_id: vale.almazaraId || ALMAZARA_ID,
             sequential_id: vale.id_vale,
-            type: vale.tipo_vale === 'Para Molturar' ? 'A_MOLTURACION' : 'B_VENTA_DIRECTA',
-            producer_id: vale.productor_id,
+            type: vale.tipo_vale === ValeType.MOLTURACION ? 'A_MOLTURACION' : 'B_VENTA_DIRECTA',
+            producer_id: (vale.productor_id && vale.productor_id.length > 20) ? vale.productor_id : null,
             producer_name: vale.productor_name,
-            parcela: vale.parcela,
+            parcela: vale.parcela || '',
             weight_kg: Number(vale.kilos_netos) || 0,
             fat_percentage: Number(vale.analitica.rendimiento_graso) || 0,
             acidity: Number(vale.analitica.acidez) || 0,
             date: vale.fecha_entrada,
             variety: vale.variedad,
             status: vale.estado as any,
-            milling_lot_id: vale.milling_lot_id,
-            campaign: vale.campaign
+            hopper_id: vale.ubicacion_id,
+            milling_lot_id: vale.milling_lot_id || null,
+            campaign: vale.campaign,
+            customer_id: vale.comprador || null,
+            customer_name: vale.comprador_name || null
         });
         return { error };
     }, skipQueue);
@@ -205,7 +210,8 @@ export const fetchTanks = async (almazaraId?: string): Promise<Tank[]> => {
         name: t.name,
         maxCapacityKg: Number(t.max_capacity_kg),
         currentKg: Number(t.current_kg),
-        variety_id: t.variety_id,
+        // IMPORTANTE: Mapear 'variety' (texto) preferentemente, fallback a 'variety_id'
+        variety_id: t.variety || t.variety_id,
         currentBatchId: t.current_batch_id,
         status: t.status as 'FILLING' | 'FULL'
     }));
@@ -219,9 +225,10 @@ export const upsertTank = async (tank: Tank, skipQueue = false) => {
             name: tank.name,
             max_capacity_kg: tank.maxCapacityKg,
             current_kg: tank.currentKg,
-            variety_id: tank.variety_id,
-            current_batch_id: tank.currentBatchId,
-            status: tank.status || 'FILLING'
+            variety: tank.variety_id || '', // Usamos el nombre de variedad
+            cycle_count: tank.cycleCount,
+            status: tank.status || 'FILLING',
+            updated_at: new Date().toISOString()
         });
         return { error };
     }, skipQueue);
@@ -297,20 +304,23 @@ export const fetchNurseTank = async (almazaraId?: string): Promise<NurseTank | n
         currentKg: Number(data.current_kg),
         lastEntryDate: data.last_entry_date,
         lastSourceTankId: data.last_source_tank_id,
-        lastEntryId: 0
+        lastEntryId: 0,
+        currentVariety: data.current_variety,
+        currentBatchId: data.current_batch_id
     };
 };
 
 export const upsertNurseTank = async (nurseTank: NurseTank, skipQueue = false) => {
     return wrapUpsert('upsertNurseTank', nurseTank, async () => {
-        // Asumimos que la tabla nurse_tanks tiene almazara_id como Primary Key o Unique
         const { error } = await supabase.from('nurse_tanks').upsert({
-            almazara_id: nurseTank.almazaraId || ALMAZARA_ID,
+            almazara_id: nurseTank.almazaraId || ALMAZARA_ID, // PK es almazara_id
             max_capacity_kg: nurseTank.maxCapacityKg,
             current_kg: nurseTank.currentKg,
             last_entry_date: nurseTank.lastEntryDate,
-            last_source_tank_id: nurseTank.lastSourceTankId
-        }, { onConflict: 'almazara_id' });
+            last_source_tank_id: nurseTank.lastSourceTankId,
+            current_variety: nurseTank.currentVariety,
+            current_batch_id: nurseTank.currentBatchId
+        });
         return { error };
     }, skipQueue);
 };
@@ -500,6 +510,43 @@ export const upsertPackagingLot = async (lot: PackagingLot, skipQueue = false) =
             source_info: lot.sourceInfo,
             source_tank_id: lot.sourceTankId,
             campaign: lot.campaign
+        });
+        return { error };
+    }, skipQueue);
+};
+
+// --- PRODUCTOS TERMINADOS (STOCK) ---
+export const fetchFinishedProducts = async (almazaraId?: string): Promise<FinishedProduct[]> => {
+    const id = almazaraId || ALMAZARA_ID;
+    const { data, error } = await supabase
+        .from('finished_products')
+        .select('*')
+        .eq('almazara_id', id);
+
+    if (error) {
+        console.error('Error fetching finished products:', error);
+        return [];
+    }
+
+    return data.map(p => ({
+        id: p.id,
+        almazaraId: p.almazara_id,
+        lotId: p.lot_id,
+        format: p.format as any,
+        type: p.type as any,
+        unitsAvailable: p.units_available
+    }));
+};
+
+export const upsertFinishedProduct = async (product: FinishedProduct, skipQueue = false) => {
+    return wrapUpsert('upsertFinishedProduct', product, async () => {
+        const { error } = await supabase.from('finished_products').upsert({
+            id: product.id,
+            almazara_id: product.almazaraId || ALMAZARA_ID,
+            lot_id: product.lotId,
+            format: product.format,
+            type: product.type,
+            units_available: product.unitsAvailable
         });
         return { error };
     }, skipQueue);

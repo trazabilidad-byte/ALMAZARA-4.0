@@ -50,7 +50,7 @@ export const MillingControl: React.FC<MillingControlProps> = ({
             // Esto vacía la tolva visualmente inmediatamente después de pulsar "MOLTURAR"
             // aunque el vale siga en estado PENDIENTE hasta el cierre del día.
             const hopperVales = pendingVales.filter(v =>
-                v.ubicacion_id === h.id &&
+                Number(v.ubicacion_id) === Number(h.id) &&
                 v.tipo_vale === ValeType.MOLTURACION &&
                 !v.milling_lot_id // <--- FIX: Si ya tiene lote asignado, no está en la tolva física
             );

@@ -78,11 +78,11 @@ export const ValesList: React.FC<ValesListProps> = ({ vales, onEdit, onView, onV
 
   const filteredVales = useMemo(() => {
     return vales.filter(v => {
-      const matchesText = 
-        v.productor_name.toLowerCase().includes(filterText.toLowerCase()) || 
+      const matchesText =
+        v.productor_name.toLowerCase().includes(filterText.toLowerCase()) ||
         v.id_vale.toString().includes(filterText) ||
         v.parcela.toLowerCase().includes(filterText.toLowerCase());
-      
+
       const matchesVariety = filterVariety === 'all' || v.variedad === filterVariety;
       const matchesType = filterType === 'all' || v.tipo_vale === filterType;
 
@@ -97,19 +97,19 @@ export const ValesList: React.FC<ValesListProps> = ({ vales, onEdit, onView, onV
           <div className="w-1.5 h-8 rounded-full bg-black shrink-0"></div>
           <h2 className="text-xl md:text-2xl lg:text-3xl font-black uppercase tracking-tighter text-[#111111]">Histórico</h2>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-            <input 
-              type="text" 
-              placeholder="Buscar por socio, finca o nº..." 
+            <input
+              type="text"
+              placeholder="Buscar por socio, finca o nº..."
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
               className="w-full bg-[#111111] text-white border-2 border-transparent focus:border-[#D9FF66] rounded-xl pl-9 pr-4 py-2.5 text-xs font-black outline-none transition-all placeholder:text-gray-500"
             />
           </div>
-          <button 
+          <button
             onClick={() => setShowFilters(!showFilters)}
             className={`p-2.5 rounded-xl border-2 transition-all shrink-0 flex items-center justify-center shadow-lg ${showFilters ? 'bg-black text-[#D9FF66] border-black' : 'bg-white border-transparent text-gray-400 hover:text-black hover:border-[#D9FF66]/20'}`}
           >
@@ -120,20 +120,20 @@ export const ValesList: React.FC<ValesListProps> = ({ vales, onEdit, onView, onV
 
       {showFilters && (
         <div className="bg-[#111111] p-6 rounded-[32px] border border-white/5 shadow-2xl animate-in slide-in-from-top-4 duration-300 grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <CustomDropdown 
+          <CustomDropdown
             label="Variedad de Oliva"
             value={filterVariety}
             options={varietyOptions}
             onChange={setFilterVariety}
           />
-          <CustomDropdown 
+          <CustomDropdown
             label="Tipo de Entrada"
             value={filterType}
             options={typeOptions}
             onChange={setFilterType}
           />
           <div className="flex items-end">
-            <button 
+            <button
               onClick={() => { setFilterVariety('all'); setFilterType('all'); setFilterText(''); }}
               className="w-full py-3.5 rounded-xl bg-white/5 text-gray-400 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-[#D9FF66] transition-all border border-white/5"
             >
@@ -161,12 +161,12 @@ export const ValesList: React.FC<ValesListProps> = ({ vales, onEdit, onView, onV
               {filteredVales.map((v) => (
                 <tr key={v.id_vale} className="hover:bg-[#F4F7F4]/30 transition-colors group">
                   <td className="px-6 py-5">
-                    <button 
+                    <button
                       onClick={() => onView(v)}
                       className="text-sm font-black text-black tracking-tight hover:text-[#D9FF66] hover:bg-black px-2 py-1 rounded transition-colors"
                       title="Ver Trazabilidad"
                     >
-                        #{v.id_vale.toString().padStart(3, '0')}
+                      #{v.id_vale.toString().padStart(3, '0')}
                     </button>
                   </td>
                   <td className="px-6 py-5">
@@ -179,24 +179,26 @@ export const ValesList: React.FC<ValesListProps> = ({ vales, onEdit, onView, onV
                     </span>
                   </td>
                   <td className="px-6 py-5 max-w-[250px]">
-                    <button 
-                        onClick={() => onViewProducer(v.productor_name)}
-                        className="text-left group/prod"
+                    <button
+                      onClick={() => onViewProducer(v.productor_name)}
+                      className="text-left group/prod"
                     >
-                        <p className="text-sm font-black text-[#111111] uppercase tracking-tighter truncate group-hover/prod:text-blue-600 transition-colors flex items-center gap-1">
-                            {v.productor_name}
-                            <ExternalLink size={10} className="opacity-0 group-hover/prod:opacity-100 text-blue-400" />
-                        </p>
+                      <p className="text-sm font-black text-[#111111] uppercase tracking-tighter truncate group-hover/prod:text-blue-600 transition-colors flex items-center gap-1">
+                        {v.productor_name}
+                        {v.tipo_vale === ValeType.VENTA_DIRECTA && v.comprador_name && (
+                          <span className="text-blue-500 lowercase font-bold"> → {v.comprador_name}</span>
+                        )}
+                        <ExternalLink size={10} className="opacity-0 group-hover/prod:opacity-100 text-blue-400" />
+                      </p>
                     </button>
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1 truncate">
                       <MapPin size={10} className="shrink-0" /> {v.parcela}
                     </p>
                   </td>
                   <td className="px-6 py-5 text-center">
-                    <span className={`px-2 py-1 rounded-md text-[9px] font-black uppercase border inline-block whitespace-nowrap ${
-                      v.variedad === OliveVariety.PICUAL ? 'bg-green-50 text-green-700 border-green-100' : 
-                      'bg-orange-50 text-orange-700 border-orange-100'
-                    }`}>
+                    <span className={`px-2 py-1 rounded-md text-[9px] font-black uppercase border inline-block whitespace-nowrap ${v.variedad === OliveVariety.PICUAL ? 'bg-green-50 text-green-700 border-green-100' :
+                        'bg-orange-50 text-orange-700 border-orange-100'
+                      }`}>
                       {v.variedad}
                     </span>
                   </td>
@@ -220,7 +222,7 @@ export const ValesList: React.FC<ValesListProps> = ({ vales, onEdit, onView, onV
                     )}
                   </td>
                   <td className="px-6 py-5 text-center">
-                    <button 
+                    <button
                       onClick={() => onEdit(v)}
                       className="p-2.5 bg-[#111111] text-[#D9FF66] hover:bg-black rounded-xl transition-all shadow-sm hover:scale-105 active:scale-95"
                       title="Editar registro completo"
