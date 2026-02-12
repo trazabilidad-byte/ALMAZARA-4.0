@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 
 export interface SyncOperation {
     id: string;
-    type: 'upsertProducer' | 'upsertVale' | 'upsertTank' | 'upsertMillingLot' | 'upsertProductionLot' | 'upsertPackagingLot' | 'upsertOilMovement' | 'upsertSalesOrder' | 'upsertPomaceExit' | 'upsertAuxEntry' | 'upsertOilExit' | 'upsertCustomer' | 'upsertAppConfig';
+    type: 'upsertProducer' | 'upsertVale' | 'upsertTank' | 'upsertMillingLot' | 'upsertProductionLot' | 'upsertPackagingLot' | 'upsertOilMovement' | 'upsertSalesOrder' | 'upsertPomaceExit' | 'upsertAuxEntry' | 'upsertOilExit' | 'upsertCustomer' | 'upsertAppConfig' | 'upsertNurseTank' | 'upsertFinishedProduct' | 'upsertHopper' | 'deleteTank' | 'deleteHopper';
     payload: any;
     timestamp: number;
 }

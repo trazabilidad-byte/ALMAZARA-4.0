@@ -87,7 +87,12 @@ export const PackagingDashboard: React.FC<PackagingDashboardProps> = ({
     const nurseEntries = useMemo(() => {
         return oilMovements
             .filter(m => m.target_tank_id === 999)
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            .sort((a, b) => {
+                const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+                if (dateDiff !== 0) return dateDiff;
+                // Si la fecha es igual (mismo día), ordenamos por ID (que contiene el timestamp)
+                return b.id.localeCompare(a.id);
+            });
     }, [oilMovements]);
 
     // --- LOTE ACTIVO DINÁMICO (HERENCIA) ---
