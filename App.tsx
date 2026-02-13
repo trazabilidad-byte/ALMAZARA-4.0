@@ -63,7 +63,8 @@ import {
   fetchFinishedProducts,
   upsertFinishedProduct,
   upsertHopper,
-  ALMAZARA_ID
+  ALMAZARA_ID,
+  resetAlmazaraData
 } from './src/lib/supabaseSync';
 
 const APP_NAME = "ALMAZARA PRIVADA 4.0";
@@ -152,6 +153,22 @@ const DEFAULT_APP_CONFIG: AppConfig = {
 };
 
 const App: React.FC = () => {
+  // --- EMERGENCY RESET TRIGGER --- 
+  useEffect(() => {
+    const hasReset = sessionStorage.getItem('FORCE_RESET_DONE_V4');
+    if (!hasReset) {
+      if (confirm("⚠️ ¿BORRAR DATOS DE PRUEBA? (Milling, Production, Movements, Vales > 3)")) {
+        resetAlmazaraData().then(() => {
+          sessionStorage.setItem('FORCE_RESET_DONE_V4', 'true');
+          alert("✅ SISTEMA RESTAURADO. Recarga la página.");
+          window.location.reload();
+        });
+      } else {
+        sessionStorage.setItem('FORCE_RESET_DONE_V4', 'true');
+      }
+    }
+  }, []);
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);

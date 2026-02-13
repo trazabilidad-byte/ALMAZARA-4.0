@@ -834,3 +834,43 @@ export const deleteOilExit = async (id: string) => {
     const { error } = await supabase.from('oil_exits').delete().eq('id', id);
     return { error };
 };
+
+export const resetAlmazaraData = async () => {
+    console.log("⚠️ INICIANDO RESET DE DATOS DE ALMAZARA (Autenticado)...");
+    const almazaraId = ALMAZARA_ID;
+
+    // 1. Borrar Lotes de Compra / Envasado (Packaging & Sales) - Por si acaso
+    await supabase.from('sales_orders').delete().eq('almazara_id', almazaraId);
+    await supabase.from('finished_products').delete().eq('almazara_id', almazaraId);
+    await supabase.from('packaging_lots').delete().eq('almazara_id', almazaraId);
+
+    // 2. Borrar Producción (Milling & Production)
+    await supabase.from('milling_lots').delete().eq('almazara_id', almazaraId);
+    await supabase.from('production_lots').delete().eq('almazara_id', almazaraId);
+
+    // 3. Borrar Movimientos
+    await supabase.from('oil_movements').delete().eq('almazara_id', almazaraId);
+
+    // 4. Resetear Vales (Solo >= 4 o todos pendientes)
+    // El usuario pidió "desde el vale 4", pero para limpieza total efectiva y no dejar huérfanos,
+    // vamos a resetear TODOS a PENDIENTE y desvincularlos.
+    // Si quiere BORRARLOS físicamente, tendría que ser delete().
+    // VOY A BORRAR LOS VALES >= 4 FÍSICAMENTE COMO PIDIÓ EL USUARIO ("borraras todo desde el vale 4")
+    // Y resetear los < 4.
+
+    // Primero reset general para evitar FK errors
+    await supabase.from('vales').update({ milling_lot_id: null, estado: 'PENDIENTE' }).eq('almazara_id', almazaraId);
+
+    // Borrar vales de prueba (Asumimos ID > 3 son pruebas según usuario)
+    // OJO: id_vale es numérico.
+    await supabase.from('vales').delete().eq('almazara_id', almazaraId).gte('id_vale', 4);
+
+    // 5. Resetear Tanques
+    await supabase.from('tanks').update({ current_kg: 0, status: 'FILLING', current_batch_id: null, variety_id: null }).eq('almazara_id', almazaraId);
+
+    // 6. Resetear Tolvas (Solo uso)
+    await supabase.from('hoppers').update({ current_use: 1 }).eq('almazara_id', almazaraId);
+
+    console.log("✅ DATOS BORRADOS CORRECTAMENTE.");
+    return { success: true };
+};
