@@ -628,6 +628,21 @@ const App: React.FC = () => {
         fetchFinishedProducts(activeId)
       ]);
 
+      // --- DETECCIÓN DE LIMPIEZA MASIVA (HARD RESET) ---
+      // Si el servidor devuelve vacío en las tablas transaccionales principales, 
+      // asumimos que el usuario ha solicitado un borrado completo.
+      // En este caso, FORZAMOS la limpieza de la cola de sincronización para evitar 
+      // que los datos locales (pendientes de subir) vuelvan a aparecer como "fantasmas".
+      if (
+        (v && v.length === 0) &&
+        (m && m.length === 0) &&
+        (pl && pl.length === 0) &&
+        (om && om.length === 0)
+      ) {
+        console.warn("⚠️ DETECTADO RESET EN SERVIDOR: Limpiando cola y forzando estado vacío.");
+        syncQueue.clear();
+      }
+
       // --- LÓGICA DE FUSIÓN (MERGE) PARA EVITAR BORRADOS ---
       // Mejorado: Si un elemento está en el servidor PERO tenemos una versión más nueva en la cola local, mantenemos la local.
       const getMergedState = (serverItems: any[], localItems: any[], opType: string) => {
