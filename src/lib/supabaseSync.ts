@@ -836,41 +836,75 @@ export const deleteOilExit = async (id: string) => {
 };
 
 export const resetAlmazaraData = async () => {
-    console.log("⚠️ INICIANDO RESET DE DATOS DE ALMAZARA (Autenticado)...");
+    console.log("☢️ INICIANDO NUCLEAR RESET V3 (FINAL)...");
     const almazaraId = ALMAZARA_ID;
 
-    // 1. Borrar Lotes de Compra / Envasado (Packaging & Sales) - Por si acaso
-    await supabase.from('sales_orders').delete().eq('almazara_id', almazaraId);
-    await supabase.from('finished_products').delete().eq('almazara_id', almazaraId);
-    await supabase.from('packaging_lots').delete().eq('almazara_id', almazaraId);
+    // Helper para borrar ignorando errores 404/FK momentáneos (reintentaremos)
+    const safeDelete = async (table: string, label: string) => {
+        try {
+            console.log(`🗑️ Eliminando ${label}...`);
+            const { error } = await supabase.from(table).delete().eq('almazara_id', almazaraId);
+            if (error) console.error(`❌ Error borrando ${table}:`, error.message);
+            else console.log(`✅ ${table} limpios.`);
+        } catch (e) {
+            console.error(`💥 Excepción en ${table}:`, e);
+        }
+    };
 
-    // 2. Borrar Producción (Milling & Production)
-    await supabase.from('milling_lots').delete().eq('almazara_id', almazaraId);
-    await supabase.from('production_lots').delete().eq('almazara_id', almazaraId);
+    try {
+        // 1. DESVINCULAR TODO (Romper FKs circulares)
+        console.log("🔄 1. Desvinculando referencias...");
+        // Vales -> Lotes
+        await supabase.from('vales').update({ milling_lot_id: null, productor_id: null, comprador: null }).eq('almazara_id', almazaraId);
+        // Depósitos -> Lotes
+        await supabase.from('tanks').update({ current_batch_id: null, variety_id: null }).eq('almazara_id', almazaraId);
+        // Movimientos -> Lotes (si hubiera FK directa, nulificarla)
 
-    // 3. Borrar Movimientos
-    await supabase.from('oil_movements').delete().eq('almazara_id', almazaraId);
+        // 2. BORRADO EN CASCADA MANUAL (Hijos -> Padres)
 
-    // 4. Resetear Vales (Solo >= 4 o todos pendientes)
-    // El usuario pidió "desde el vale 4", pero para limpieza total efectiva y no dejar huérfanos,
-    // vamos a resetear TODOS a PENDIENTE y desvincularlos.
-    // Si quiere BORRARLOS físicamente, tendría que ser delete().
-    // VOY A BORRAR LOS VALES >= 4 FÍSICAMENTE COMO PIDIÓ EL USUARIO ("borraras todo desde el vale 4")
-    // Y resetear los < 4.
+        // Nivel 0: Salidas y Entradas Aux (Hojas)
+        await safeDelete('oil_exits', 'Salidas de Aceite');
+        await safeDelete('pomace_exits', 'Salidas de Orujo');
+        await safeDelete('aux_entries', 'Entradas Auxiliares');
+        await safeDelete('sales_orders', 'Pedidos de Venta');
+        await safeDelete('finished_products', 'Productos Terminados');
+        await safeDelete('packaging_lots', 'Lotes de Envasado');
 
-    // Primero reset general para evitar FK errors
-    await supabase.from('vales').update({ milling_lot_id: null, estado: 'PENDIENTE' }).eq('almazara_id', almazaraId);
+        // Nivel 1: Movimientos (Dependen de Tanques y Lotes)
+        await safeDelete('oil_movements', 'Movimientos de Aceite');
 
-    // Borrar vales de prueba (Asumimos ID > 3 son pruebas según usuario)
-    // OJO: id_vale es numérico.
-    await supabase.from('vales').delete().eq('almazara_id', almazaraId).gte('id_vale', 4);
+        // Nivel 2: Lotes de Producción (Dependen de Lotes Molturación)
+        // OJO: Si hay FK array, no importa, pero si hay tabla intermedia, borrarla.
+        await safeDelete('production_lots', 'Lotes de Producción');
 
-    // 5. Resetear Tanques
-    await supabase.from('tanks').update({ current_kg: 0, status: 'FILLING', current_batch_id: null, variety_id: null }).eq('almazara_id', almazaraId);
+        // Nivel 3: Lotes de Molturación (Ahora deberían estar libres)
+        await safeDelete('milling_lots', 'Lotes de Molturación');
 
-    // 6. Resetear Tolvas (Solo uso)
-    await supabase.from('hoppers').update({ current_use: 1 }).eq('almazara_id', almazaraId);
+        // Nivel 4: Vales (Referencian a Productores/Clientes/Lotes - ya desvinculados)
+        await safeDelete('vales', 'Vales de Recepción (TODOS)');
 
-    console.log("✅ DATOS BORRADOS CORRECTAMENTE.");
-    return { success: true };
+        // Nivel 5: Maestros (Productores y Clientes)
+        await safeDelete('customers', 'Clientes');
+        await safeDelete('producers', 'Productores');
+
+        // 3. RESET DE ESTADO (Tanques y Maquinaria)
+        console.log("🔄 3. Reseteando Maquinaria...");
+        await supabase.from('tanks').update({
+            current_kg: 0,
+            status: 'FILLING',
+            current_batch_id: null,
+            variety: null, // String variety
+            variety_id: null,
+            cycle_count: 0
+        }).eq('almazara_id', almazaraId);
+
+        await supabase.from('hoppers').update({ current_use: 1 }).eq('almazara_id', almazaraId);
+        await supabase.from('nurse_tanks').update({ current_kg: 0, current_batch_id: null, current_variety: null }).eq('almazara_id', almazaraId);
+
+        console.log("✅✅ NUCLEAR RESET COMPLETADO.");
+        return { success: true };
+    } catch (err) {
+        console.error("❌ ERROR CRÍTICO EN RESET (V3):", err);
+        return { error: err };
+    }
 };

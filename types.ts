@@ -140,6 +140,7 @@ export interface OilMovement {
   kg: number;
   variety: OliveVariety | string;
   operator: string;
+  notes?: string; // Motivo del movimiento (ajustes, etc)
   campaign?: string; // Nuevo para histórico
   batch_id?: string; // Nuevo: ID del lote generado (ej: "1/2/2025" para entrada a nodriza)
   // Nuevo: Detalles de cierre de lote (Hito)

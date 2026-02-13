@@ -58,7 +58,8 @@ export const MillingControl: React.FC<MillingControlProps> = ({
             const hopperVales = pendingVales.filter(v =>
                 Number(v.ubicacion_id) === Number(h.id) &&
                 v.tipo_vale === ValeType.MOLTURACION &&
-                !v.milling_lot_id // <--- FIX: Si ya tiene lote asignado, no está en la tolva física
+                v.tipo_vale === ValeType.MOLTURACION &&
+                !v.milling_lot_id && v.milling_lot_id !== '' // <--- FIX: Si ya tiene lote asignado (aunque sea string), no está en la tolva física
             );
 
             if (hopperVales.length === 0) return { ...h, status: 'empty', activeBatch: null, queuedBatches: [] };

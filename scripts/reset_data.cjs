@@ -7,70 +7,75 @@ const ALMAZARA_ID = '9e3f173e-1b36-4830-8213-e57dc8e59b3b';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function resetData() {
-    console.log('⚠️ INICIANDO RESET DE DATOS DE PRODUCCIÓN...');
+    console.log('⚠️ INICIANDO RESET DE DATOS CORRECTO (Node Script)...');
 
-    // 1. Borrar Lotes de Molturación (Milling Lots)
-    console.log('🗑️  Borrando Milling Lots...');
-    const { error: errMilling } = await supabase
-        .from('milling_lots')
-        .delete()
+    // 0. DESVINCULAR VALES (Primero, para romper FK constraints)
+    // COLUMNAS: status (no estado), sequential_id (no id_vale)
+    console.log('🔄 0. Desvinculando Vales de Lotes...');
+    const { error: errUnlink } = await supabase
+        .from('vales')
+        .update({ milling_lot_id: null, status: 'PENDIENTE' })
         .eq('almazara_id', ALMAZARA_ID);
 
-    if (errMilling) console.error('Error Milling Lots:', errMilling);
-    else console.log('✅ Milling Lots borrados.');
+    if (errUnlink) console.error('❌ Error Unlinking Vales:', errUnlink);
+    else console.log('✅ Vales desvinculados y puestos en PENDIENTE.');
 
-    // 2. Borrar Lotes de Producción (Production Lots)
-    console.log('🗑️  Borrando Production Lots...');
-    const { error: errProd } = await supabase
-        .from('production_lots')
-        .delete()
-        .eq('almazara_id', ALMAZARA_ID);
-
-    if (errProd) console.error('Error Production Lots:', errProd);
-    else console.log('✅ Production Lots borrados.');
-
-    // 3. Borrar Movimientos de Aceite (Oil Movements)
-    // Borramos TODOS los movimientos excepto ajustes iniciales si los hubiera (pero el usuario pidió reset total de pruebas)
-    console.log('🗑️  Borrando Movimientos de Aceite...');
+    // 1. Borrar Movimientos
+    console.log('🗑️ 1. Borrando Movimientos...');
     const { error: errMov } = await supabase
         .from('oil_movements')
         .delete()
         .eq('almazara_id', ALMAZARA_ID);
-
-    if (errMov) console.error('Error Oil Movements:', errMov);
+    if (errMov) console.error('❌ Error Oil Movements:', errMov);
     else console.log('✅ Movimientos borrados.');
 
-    // 4. Resetear Vales (Vales)
-    console.log('🔄 Reseteando Vales a PENDIENTE...');
-    const { error: errVales } = await supabase
-        .from('vales')
-        .update({
-            estado: 'PENDIENTE',
-            milling_lot_id: null,
-            // Mantener el uso_contador y ubicación es correcto físicamente
-        })
+    // 2. Borrar Lotes de Producción
+    console.log('🗑️ 2. Borrando Production Lots...');
+    const { error: errProd } = await supabase
+        .from('production_lots')
+        .delete()
         .eq('almazara_id', ALMAZARA_ID);
+    if (errProd) console.error('❌ Error Production Lots:', errProd);
+    else console.log('✅ Production Lots borrados.');
 
-    if (errVales) console.error('Error Vales:', errVales);
-    else console.log('✅ Vales reseteados.');
+    // 3. Borrar Lotes de Molturación
+    console.log('🗑️ 3. Borrando Milling Lots...');
+    const { error: errMilling } = await supabase
+        .from('milling_lots')
+        .delete()
+        .eq('almazara_id', ALMAZARA_ID);
+    if (errMilling) console.error('❌ Error Milling Lots:', errMilling);
+    else console.log('✅ Milling Lots borrados.');
 
-    // 5. Resetear Tanques (Tanks)
-    console.log('🔄 Reseteando Tanques a VACÍO...');
+    // 4. Borrar Vales de Prueba (>= 4)
+    console.log('🗑️ 4. Borrando Vales >= 4 (sequential_id)...');
+    const { error: errValesDel } = await supabase
+        .from('vales')
+        .delete()
+        .eq('almazara_id', ALMAZARA_ID)
+        .gte('sequential_id', 4);
+    if (errValesDel) console.error('❌ Error Deleting Vales:', errValesDel);
+    else console.log('✅ Vales >= 4 borrados.');
+
+    // 5. Resetear Tanques
+    console.log('🔄 5. Reseteando Tanques...');
     const { error: errTanks } = await supabase
         .from('tanks')
-        .update({
-            current_kg: 0,
-            status: 'FILLING',
-            current_batch_id: null,
-            variety_id: null
-            // cycle_count se mantiene o se podría resetear, pero mejor dejarlo
-        })
+        .update({ current_kg: 0, status: 'FILLING', current_batch_id: null, variety_id: null })
         .eq('almazara_id', ALMAZARA_ID);
-
-    if (errTanks) console.error('Error Tanks:', errTanks);
+    if (errTanks) console.error('❌ Error Tanks:', errTanks);
     else console.log('✅ Tanques reseteados.');
 
-    console.log('🏁 RESET COMPLETADO. Por favor, recarga la página web.');
+    // 6. Resetear Tolvas
+    console.log('🔄 6. Reseteando Tolvas...');
+    const { error: errHoppers } = await supabase
+        .from('hoppers')
+        .update({ current_use: 1 })
+        .eq('almazara_id', ALMAZARA_ID);
+    if (errHoppers) console.error('❌ Error Hoppers:', errHoppers);
+    else console.log('✅ Tolvas reseteadas.');
+
+    console.log('🏁 RESET COMPLETADO.');
 }
 
 resetData();

@@ -128,7 +128,8 @@ export const CellarDashboard: React.FC<CellarDashboardProps> = ({
                 targetId: m.target_tank_id,
                 batchId: m.batch_id,
                 closureDetails: m.closureDetails,
-                detail: null as any
+                detail: null as any,
+                notes: m.notes // Añadido notes
             }));
 
         const exits = oilExits
@@ -144,7 +145,8 @@ export const CellarDashboard: React.FC<CellarDashboardProps> = ({
                 targetId: null,
                 batchId: undefined,
                 closureDetails: undefined,
-                detail: e
+                detail: e,
+                notes: e.notes
             }));
 
         return [...internal, ...exits].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -285,7 +287,7 @@ export const CellarDashboard: React.FC<CellarDashboardProps> = ({
                     millingLots={millingLots}
                     vales={vales}
                     producers={producers}
-                    oilMovements={oilMovements}
+                    oilMovements={unifiedHistory}
                     oilExits={oilExits}
                     productionLots={productionLots}
                     config={config}
