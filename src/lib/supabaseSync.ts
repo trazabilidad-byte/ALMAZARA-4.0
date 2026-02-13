@@ -167,6 +167,12 @@ export const fetchVales = async (almazaraId?: string): Promise<Vale[]> => {
 };
 
 export const upsertVale = async (vale: Vale, skipQueue = false) => {
+    console.log("📤 Intentando guardar VALE en Supabase:", {
+        id_vale: vale.id_vale,
+        id: vale.id,
+        estado: vale.estado,
+        almazaraId: vale.almazaraId || ALMAZARA_ID
+    });
     return wrapUpsert('upsertVale', vale, async () => {
         const { error } = await supabase.from('vales').upsert({
             id: vale.id,
