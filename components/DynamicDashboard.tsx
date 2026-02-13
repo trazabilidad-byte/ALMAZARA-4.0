@@ -135,23 +135,48 @@ export const DynamicDashboard: React.FC<DynamicDashboardProps> = ({
 
     const pendingVales = useMemo(() => vales.filter(v => v.estado === 'Pendiente'), [vales]);
 
-    const activeHoppers = useMemo(() => {
+    const activeHoppersData = useMemo(() => {
         return hoppers.map(h => {
             const hopperVales = pendingVales.filter(v =>
                 Number(v.ubicacion_id) === Number(h.id) &&
+                v.tipo_vale === ValeType.MOLTURACION &&
                 !v.milling_lot_id
             );
-            if (hopperVales.length === 0) return { ...h, status: 'empty', vales: [], totalKg: 0, theoreticalOil: 0, avgYield: 0, variety: '' };
 
-            const currentUse = hopperVales[0].uso_contador;
-            const activeVales = hopperVales.filter(v => v.uso_contador === currentUse);
-            const totalKg = activeVales.reduce((acc, v) => acc + v.kilos_netos, 0);
-            const theoreticalOil = activeVales.reduce((acc, v) => acc + (v.kilos_netos * (v.analitica.rendimiento_graso || 0) / 100), 0);
-            const avgYield = activeVales.length > 0 ? activeVales.reduce((acc, v) => acc + v.analitica.rendimiento_graso, 0) / activeVales.length : 0;
+            if (hopperVales.length === 0) return { ...h, status: 'empty', activeBatch: null, queuedBatches: [] };
 
-            return { ...h, status: 'active', currentUse, vales: activeVales, totalKg, theoreticalOil, avgYield, variety: activeVales[0].variedad };
+            const usages = Array.from(new Set(hopperVales.map(v => v.uso_contador))).sort((a, b) => Number(a) - Number(b));
+
+            const batches = usages.map(uso => {
+                const batchVales = hopperVales.filter(v => v.uso_contador === uso);
+                const totalKg = batchVales.reduce((acc, v) => acc + v.kilos_netos, 0);
+
+                const theoreticalOil = batchVales.reduce((acc, v) => {
+                    let yieldPercent = v.analitica.rendimiento_graso;
+                    if (!yieldPercent || yieldPercent === 0) {
+                        yieldPercent = config.varietySettings?.[v.variedad]?.defaultYield || 18;
+                    }
+                    return acc + (v.kilos_netos * yieldPercent / 100);
+                }, 0);
+
+                const avgYield = totalKg > 0 ? (theoreticalOil / totalKg) * 100 : 0;
+
+                return {
+                    uso,
+                    vales: batchVales,
+                    totalKg,
+                    theoreticalOil,
+                    avgYield,
+                    variety: batchVales[0].variedad
+                };
+            });
+
+            const activeBatch = batches[0];
+            const queuedBatches = batches.slice(1);
+
+            return { ...h, status: 'active', activeBatch, queuedBatches };
         });
-    }, [hoppers, pendingVales]);
+    }, [hoppers, pendingVales, config]);
 
     const tankLots = useMemo(() => {
         if (!selectedTank) return [];
@@ -263,7 +288,7 @@ export const DynamicDashboard: React.FC<DynamicDashboardProps> = ({
                 <h2 className="text-xl font-black uppercase text-[#111111]">Tolvas de Recepción</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {activeHoppers.map(hopper => (
+                {activeHoppersData.map(hopper => (
                     <div key={hopper.id} className={`relative rounded-[32px] overflow-hidden border transition-all ${hopper.status === 'active' ? 'bg-white border-[#D9FF66] shadow-xl' : 'bg-gray-50 border-gray-100 opacity-60'}`}>
                         <div className="p-6">
                             <div className="flex justify-between items-start mb-4">
@@ -276,38 +301,46 @@ export const DynamicDashboard: React.FC<DynamicDashboardProps> = ({
                                         </div>
                                     )}
                                 </div>
-                                <span className="bg-[#111111] text-white px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest">
-                                    {hopper.status === 'active' ? `Lote MT ${hopper.id}/${hopper.currentUse}` : 'Inactiva'}
+                                <span className={`${hopper.status === 'active' ? 'bg-[#111111] text-white' : 'bg-gray-200 text-gray-400'} px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest`}>
+                                    {hopper.status === 'active' ? `Lote MT ${hopper.id}/${hopper.activeBatch?.uso}` : 'Inactiva'}
                                 </span>
                             </div>
 
-                            {hopper.status === 'active' ? (
-                                <div className="space-y-6">
-                                    <div>
-                                        <h3 className="text-2xl font-black text-[#111111] uppercase tracking-tighter mb-1">{hopper.variety}</h3>
-                                        <p className="text-xs font-bold text-gray-400">{hopper.vales.length} Entradas Agrupadas</p>
+                            {hopper.status === 'active' && hopper.activeBatch ? (
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-end">
+                                        <div>
+                                            <h3 className="text-2xl font-black text-[#111111] uppercase tracking-tighter mb-1">{hopper.activeBatch.variety}</h3>
+                                            <p className="text-xs font-bold text-gray-400">{hopper.activeBatch.vales.length} Entradas</p>
+                                        </div>
+                                        {hopper.queuedBatches.length > 0 && (
+                                            <div className="flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100">
+                                                <Layers size={14} className="text-amber-600" />
+                                                <span className="text-[10px] font-black text-amber-700 uppercase">+{hopper.queuedBatches.length} En Cola</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4 bg-[#F9FAF9] p-4 rounded-2xl border border-gray-100">
                                         <div>
                                             <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Aceituna Neta</p>
-                                            <p className="text-lg font-black text-[#111111]">{hopper.totalKg?.toLocaleString()} kg</p>
+                                            <p className="text-lg font-black text-[#111111]">{hopper.activeBatch.totalKg?.toLocaleString()} kg</p>
                                         </div>
                                         <div>
                                             <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Rend. Medio</p>
-                                            <p className="text-lg font-black text-[#111111]">{hopper.avgYield?.toFixed(2)}%</p>
+                                            <p className="text-lg font-black text-[#111111]">{hopper.activeBatch.avgYield?.toFixed(2)}%</p>
                                         </div>
                                     </div>
 
                                     <div className="flex justify-between items-center px-2">
-                                        <span className="text-xs font-bold text-gray-500 uppercase">Aceite Teórico Estimado</span>
+                                        <span className="text-xs font-bold text-gray-500 uppercase">Aceite Estimado</span>
                                         <span className="text-xl font-black text-[#D9FF66] bg-black px-3 py-1 rounded-lg">
-                                            {Math.round(hopper.theoreticalOil || 0).toLocaleString()} kg
+                                            {Math.round(hopper.activeBatch.theoreticalOil || 0).toLocaleString()} kg
                                         </span>
                                     </div>
 
                                     <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-50">
-                                        {hopper.vales.map(v => (
+                                        {hopper.activeBatch.vales.map(v => (
                                             <button
                                                 key={v.id_vale}
                                                 onClick={(e) => { e.stopPropagation(); onViewValeDetails(v); }}
