@@ -35,6 +35,12 @@ export const MillingControl: React.FC<MillingControlProps> = ({
 }) => {
     const [viewingProductionLot, setViewingProductionLot] = useState<ProductionLot | null>(null);
     const [showDayCloseModal, setShowDayCloseModal] = useState(false);
+    const [expandedQueues, setExpandedQueues] = useState<Record<string, boolean>>({});
+
+    const toggleQueue = (hopperId: number, uso: number) => {
+        const key = `${hopperId}-${uso}`;
+        setExpandedQueues(prev => ({ ...prev, [key]: !prev[key] }));
+    };
 
     useEffect(() => {
         if (initialViewProductionLotId) {
@@ -377,20 +383,50 @@ export const MillingControl: React.FC<MillingControlProps> = ({
                                         <Clock size={10} /> En Cola de Espera
                                     </p>
                                     <div className="space-y-2">
-                                        {hopper.queuedBatches.map(batch => (
-                                            <div key={batch.uso} className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-black bg-[#111111] px-2 py-0.5 rounded text-[#D9FF66]">
-                                                        USO #{batch.uso}
-                                                    </span>
-                                                    <span className="text-xs font-bold text-[#111111] uppercase">{batch.variety}</span>
+                                        {hopper.queuedBatches.map(batch => {
+                                            const queueId = `${hopper.id}-${batch.uso}`;
+                                            const isExpanded = expandedQueues[queueId];
+
+                                            return (
+                                                <div key={batch.uso} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                                                    <div
+                                                        onClick={() => toggleQueue(hopper.id, batch.uso)}
+                                                        className="flex justify-between items-center p-2 cursor-pointer hover:bg-gray-50 transition-colors"
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="bg-gray-100 p-1 rounded">
+                                                                {isExpanded ? <ChevronUp size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
+                                                            </div>
+                                                            <span className="text-[10px] font-black bg-[#111111] px-2 py-0.5 rounded text-[#D9FF66]">
+                                                                USO #{batch.uso}
+                                                            </span>
+                                                            <span className="text-xs font-bold text-[#111111] uppercase">{batch.variety}</span>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <span className="text-xs font-black text-[#111111]">{batch.totalKg.toLocaleString()} kg</span>
+                                                            <p className="text-[8px] text-gray-400 font-bold">{batch.vales.length} vales</p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* DETALLE EXPANDIBLE DE LA COLA */}
+                                                    {isExpanded && (
+                                                        <div className="px-2 pb-2 pt-0 animate-in slide-in-from-top-2 duration-200">
+                                                            <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-gray-100">
+                                                                {batch.vales.map(v => (
+                                                                    <button
+                                                                        key={v.id_vale}
+                                                                        onClick={(e) => { e.stopPropagation(); onViewValeDetails(v); }}
+                                                                        className="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-[10px] font-black text-gray-600 hover:bg-black hover:text-[#D9FF66] hover:border-black transition-all"
+                                                                    >
+                                                                        #{v.id_vale}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="text-right">
-                                                    <span className="text-xs font-black text-[#111111]">{batch.totalKg.toLocaleString()} kg</span>
-                                                    <p className="text-[8px] text-gray-400 font-bold">{batch.vales.length} vales</p>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
