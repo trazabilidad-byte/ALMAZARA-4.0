@@ -657,53 +657,22 @@ const App: React.FC = () => {
       };
 
       // 3. Aplicar datos del servidor sólo si no hay errores (v, p, t no son nulos)
-      if (p && p.length > 0) setProducers(prev => getMergedState(p, prev, 'upsertProducer'));
+      // 3. Aplicar datos del servidor (Si no son nulos/undefined, indicando error de red)
+      // Modificado: Aceptamos arrays vacíos para reflejar borrados del servidor.
+
+      if (p) setProducers(prev => getMergedState(p, prev, 'upsertProducer'));
 
       if (v) setVales(prev => {
-        // Si el servidor no devuelve nada, pero tenemos datos locales, no borramos TODO 
-        // a menos que estemos seguros de que el servidor está vacío intencionadamente.
-        if (v.length === 0 && prev.length > 0) {
-          // Si el servidor está vacío después de un reset, aceptamos el vacío
-          // PERO mantenemos lo que esté en la cola de sincronización.
-        }
-
-        const queueOps = syncQueue.get().filter(op => op.type === 'upsertVale');
-        const pendingIds = new Set(queueOps.map(op => op.payload.id));
-        const pendingLocally = prev.filter(item => pendingIds.has(item.id));
-        const serverIds = new Set(v.map(item => item.id));
-
-        // 5. Unir y Deduplicar: 
-        // Primero tomamos todo lo del servidor.
-        // Después todo lo local que NO está en el servidor (para no perder datos recién creados o desincronizados).
-        const combined = [...v, ...prev.filter(item => !serverIds.has(item.id))];
-        const deduplicated = new Map<number, Vale>();
-
-        combined.forEach(item => {
-          const existing = deduplicated.get(item.id_vale);
-          // Prioridad: Si hay duplicado de id_vale, preferimos el que esté en la cola de sync (más nuevo localmente)
-          // Si no, el que tenga el ID (UUID) que ya conocíamos si no ha cambiado.
-          if (!existing || pendingIds.has(item.id)) {
-            deduplicated.set(item.id_vale, item);
-          }
-        });
-
-        const finalVales = Array.from(deduplicated.values());
-        console.log(`Sync - Vales: Servidor(${v.length}), Local(${prev.length}), Final(${finalVales.length})`);
-        return finalVales;
+        // Usamos la misma lógica robusta de 'getMergedState' para Vales
+        return getMergedState(v, prev, 'upsertVale');
       });
 
-      // Smart Merge para Tanques: No sobreescribir si tenemos pendientes
-      if (t && t.length > 0) {
-        setTanks(prev => {
-          // Si tenemos cambios locales recientes que no han subido, el servidor podría estarlos machacando.
-          // Como los tanques son críticos, hacemos un merge simple:
-          // Si el dato del servidor tiene fecha de actualización mayor, lo usamos.
-          // Pero como no controlamos timestamps finos, confiamos en la cola de sync?
-          // Simplificación: Usamos el del servidor PERO si hay operaciones pendientes en cola para ese tanque, las respetamos.
-          return getMergedState(t, prev, 'upsertTank');
-        });
+      // Smart Merge para Tanques
+      if (t) {
+        setTanks(prev => getMergedState(t, prev, 'upsertTank'));
       }
-      if (h && h.length > 0) setHoppers(h);
+
+      if (h) setHoppers(h);
       if (m) setMillingLots(prev => getMergedState(m, prev, 'upsertMillingLot'));
       if (c) setCustomers(prev => getMergedState(c, prev, 'upsertCustomer'));
       if (pl) setProductionLots(prev => getMergedState(pl, prev, 'upsertProductionLot'));
