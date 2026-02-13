@@ -22,9 +22,7 @@ import { AuthScreen } from './components/AuthScreen';
 import { Tank, UserRole, Producer, Vale, Hopper, MillingLot, Customer, OilExit, OilMovement, NurseTank, PackagingLot, FinishedProduct, AuxEntry, AuxStock, SalesOrder, PomaceExit, AppConfig, User, UserRole as Role, ValeType, ValeStatus, OliveVariety, ExitType, ProductionLot, ProducerStatus, CustomerStatus } from './types';
 import { NAV_ITEMS } from './constants';
 import { Plus, CalendarRange, ShieldCheck, Wifi, WifiOff, RefreshCw, X } from 'lucide-react';
-import { useOfflineSync } from './src/lib/useOfflineSync';
-import { syncQueue } from './src/lib/syncQueue';
-import { supabase } from './src/lib/supabase';
+
 import {
   fetchProducers,
   fetchVales,
@@ -60,11 +58,13 @@ import {
   deleteMillingLot,
   fetchNurseTank,
   upsertNurseTank,
+  deleteProducer,
+  deleteCustomer,
+  resetAlmazaraData,
   fetchFinishedProducts,
   upsertFinishedProduct,
   upsertHopper,
-  ALMAZARA_ID,
-  resetAlmazaraData
+  ALMAZARA_ID
 } from './src/lib/supabaseSync';
 
 const APP_NAME = "ALMAZARA PRIVADA 4.0";
@@ -172,7 +172,6 @@ const App: React.FC = () => {
   });
 
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { isOnline, isSyncing, pendingCount } = useOfflineSync();
 
   const getActiveAlmazaraId = () => {
     return (currentUser?.almazaraId && currentUser.almazaraId !== 'unknown' && currentUser.almazaraId !== 'private-user')
@@ -602,13 +601,11 @@ const App: React.FC = () => {
   };
 
   // --- LÓGICA DE CARGA DESDE SUPABASE ---
-  const refreshAllData = async () => {
-    if (!currentUser || isRefreshing) return;
-    setIsRefreshing(true);
-    const activeId = currentUser.almazaraId;
-    console.log("🔄 Recarga manual solicitada para:", activeId);
-    setSyncAlmazaraId(activeId);
+  const refreshAllData = async (almazaraId?: string) => {
+    const activeId = almazaraId || getActiveAlmazaraId();
+    if (!activeId || activeId === 'unknown') return;
 
+    setIsRefreshing(true);
     try {
       const [p, v, t, h, m, c, pl, pk, om, so, pe, ae, oe, nt, fp] = await Promise.all([
         fetchProducers(activeId),
@@ -628,101 +625,26 @@ const App: React.FC = () => {
         fetchFinishedProducts(activeId)
       ]);
 
-      // --- DETECCIÓN DE LIMPIEZA MASIVA (HARD RESET) ---
-      // Si el servidor devuelve vacío en las tablas transaccionales principales, 
-      // asumimos que el usuario ha solicitado un borrado completo.
-      // En este caso, FORZAMOS la limpieza de la cola de sincronización para evitar 
-      // que los datos locales (pendientes de subir) vuelvan a aparecer como "fantasmas".
-      if (
-        (v && v.length === 0) &&
-        (m && m.length === 0) &&
-        (pl && pl.length === 0) &&
-        (om && om.length === 0)
-      ) {
-        console.warn("⚠️ DETECTADO RESET EN SERVIDOR: Limpiando cola y forzando estado vacío.");
-        syncQueue.clear();
-      }
-
-      // --- LÓGICA DE FUSIÓN (MERGE) PARA EVITAR BORRADOS ---
-      // Mejorado: Si un elemento está en el servidor PERO tenemos una versión más nueva en la cola local, mantenemos la local.
-      const getMergedState = (serverItems: any[], localItems: any[], opType: string) => {
-        const queue = syncQueue.get();
-        const pendingOps = queue.filter(op => op.type === opType);
-        const pendingIds = new Set(pendingOps.map(op => op.payload.id || op.payload.id_vale));
-
-        // 1. Empezamos con los del servidor
-        const merged = serverItems.map(sItem => {
-          const sId = sItem.id || sItem.id_vale;
-          // Si este item del servidor tiene una actualización pendiente en nuestra cola local, usamos la local
-          if (pendingIds.has(sId)) {
-            const localNewer = localItems.find(l => (l.id === sId && sId) || (l.id_vale === sId && sId));
-            return localNewer || sItem;
-          }
-          return sItem;
-        });
-
-        // 2. Añadimos los que están en la cola local pero aún no existen en el servidor
-        const serverIds = new Set(serverItems.map(item => item.id || item.id_vale));
-        const localsNotInServer = localItems.filter(l => {
-          const lId = l.id || l.id_vale;
-          return pendingIds.has(lId) && !serverIds.has(lId);
-        });
-
-        return [...merged, ...localsNotInServer];
-      };
-
-      // 3. Aplicar datos del servidor sólo si no hay errores (v, p, t no son nulos)
-      // 3. Aplicar datos del servidor (Si no son nulos/undefined, indicando error de red)
-      // Modificado: Aceptamos arrays vacíos para reflejar borrados del servidor.
-
-      if (p) setProducers(prev => getMergedState(p, prev, 'upsertProducer'));
-
-      if (v) setVales(prev => {
-        // Usamos la misma lógica robusta de 'getMergedState' para Vales
-        return getMergedState(v, prev, 'upsertVale');
-      });
-
-      // Smart Merge para Tanques
-      if (t) {
-        setTanks(prev => getMergedState(t, prev, 'upsertTank'));
-      }
-
+      // Aplicar datos del servidor directamente. Sin Smart Merge.
+      if (p) setProducers(p);
+      if (v) setVales(v);
+      if (t) setTanks(t);
       if (h) setHoppers(h);
-      if (m) setMillingLots(prev => getMergedState(m, prev, 'upsertMillingLot'));
-      if (c) setCustomers(prev => getMergedState(c, prev, 'upsertCustomer'));
-      if (pl) setProductionLots(prev => getMergedState(pl, prev, 'upsertProductionLot'));
-      if (pk) setPackagingLots(prev => getMergedState(pk, prev, 'upsertPackagingLot'));
-      if (om) setOilMovements(prev => getMergedState(om, prev, 'upsertOilMovement'));
-      if (so) setSalesOrders(prev => getMergedState(so, prev, 'upsertSalesOrder'));
-      if (pe) setPomaceExits(prev => getMergedState(pe, prev, 'upsertPomaceExit'));
-      if (ae) setAuxEntries(prev => getMergedState(ae, prev, 'upsertAuxEntry'));
-      if (oe) setOilExits(prev => getMergedState(oe, prev, 'upsertOilExit'));
-      if (nt) {
-        // Evitar sobreescribir si tenemos una actualización de nodriza pendiente en la cola
-        const queue = syncQueue.get();
-        const hasPendingNurseUpdate = queue.some(op => op.type === 'upsertNurseTank');
+      if (m) setMillingLots(m);
+      if (c) setCustomers(c);
+      if (pl) setProductionLots(pl);
+      if (pk) setPackagingLots(pk);
+      if (om) setOilMovements(om);
+      if (so) setSalesOrders(so);
+      if (pe) setPomaceExits(pe);
+      if (ae) setAuxEntries(ae);
+      if (oe) setOilExits(oe);
+      if (nt) setNurseTank(nt);
+      if (fp) setFinishedProducts(fp);
 
-        if (!hasPendingNurseUpdate) {
-          setNurseTank(nt);
-          console.log("✅ Nodriza sincronizada desde servidor:", nt);
-        } else {
-          console.log("⏳ Sincronización de Nodriza pospuesta: hay cambios locales pendientes de subir.");
-        }
-      } else {
-        // Si no viene del servidor por el ID específico, intentamos con el ID por defecto
-        const fallbackNt = await fetchNurseTank(ALMAZARA_ID);
-        if (fallbackNt) {
-          const queue = syncQueue.get();
-          if (!queue.some(op => op.type === 'upsertNurseTank')) setNurseTank(fallbackNt);
-        }
-      }
-
-      if (fp) setFinishedProducts(prev => getMergedState(fp, prev, 'upsertFinishedProduct'));
-
-      console.log("✅ Datos actualizados correctamente");
+      console.log("✅ Datos actualizados correctamente desde el servidor");
     } catch (error) {
       console.error("❌ Error en recarga:", error);
-      alert("Error al sincronizar datos. Comprueba tu conexión.");
     } finally {
       setIsRefreshing(false);
     }
@@ -734,32 +656,18 @@ const App: React.FC = () => {
 
     setIsRefreshing(true);
     try {
-      // 1. Limpiar localStorage de datos de esta almazara
+      // 1. Resetear en Servidor
+      const { error } = await resetAlmazaraData(getActiveAlmazaraId());
+      if (error) throw error;
+
+      // 2. Limpiar localStorage de datos de esta almazara
       const keysToClear = [
         'app_vales', 'app_producers', 'app_customers', 'app_millingLots',
         'app_productionLots', 'app_oilExits', 'app_salesOrders', 'app_pomaceExits',
-        'app_packagingLots', 'app_finishedProducts', 'app_auxEntries', 'app_oilMovements'
+        'app_packagingLots', 'app_finishedProducts', 'app_auxEntries', 'app_oilMovements',
+        'app_tanks', 'app_nurseTank'
       ];
       keysToClear.forEach(k => localStorage.removeItem(k));
-      localStorage.removeItem('almazara_sync_queue');
-
-      // 2. Resetear estados locales a vacío o valores iniciales
-      setVales([]);
-      setProducers([]);
-      setCustomers([]);
-      setMillingLots([]);
-      setProductionLots([]);
-      setOilExits([]);
-      setSalesOrders([]);
-      setPomaceExits([]);
-      setPackagingLots([]);
-      setFinishedProducts([]);
-      setAuxEntries([]);
-      setOilMovements([]);
-
-      // Resetear tanques a 0
-      setTanks(prev => prev.map(t => ({ ...t, currentKg: 0, variety_id: undefined, currentBatchId: undefined, variety: undefined, status: 'FILLING' as const })));
-      setNurseTank(prev => ({ ...prev, currentKg: 0, currentBatchId: null, currentVariety: undefined }));
 
       alert("Reinicio completado con éxito.");
       window.location.reload();
@@ -1041,7 +949,8 @@ const App: React.FC = () => {
 
     switch (activeTab) {
       case 'dashboard': return <DynamicDashboard config={appConfig} tanks={tanks} hoppers={hoppers} vales={fVales} millingLots={fMilling} auxStock={auxStock} salesOrders={fSales} producers={producers} oilMovements={fMovements} oilExits={fExits} productionLots={fProdLots} onExit={() => { }} onStartLot={() => { }} onViewTankDetails={() => { }} onViewValeDetails={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onViewLot={(lotId) => { setTraceSearchTerm(lotId); setActiveTab('traceability'); }} onViewProducer={(producerId) => { const p = producers.find(x => x.id === producerId); if (p) { setSelectedProducer(p); setActiveTab('producers'); } }} onViewExit={(exit) => { setTraceSearchTerm(exit.id); setActiveTab('traceability'); }} setActiveTab={setActiveTab} />;
-      case 'producers': if (selectedProducer) return <ProducerDetail producer={selectedProducer} vales={vales} onBack={() => setSelectedProducer(null)} onViewVale={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onEdit={() => { setEditingProducer(selectedProducer); setShowProducerForm(true); }} onArchive={async () => { if (selectedProducer.status === ProducerStatus.ARCHIVED) { if (confirm(`¿Desea restaurar al socio "${selectedProducer.name}"?`)) { const updated = { ...selectedProducer, status: ProducerStatus.ACTIVE }; setProducers(prev => prev.map(p => p.id === selectedProducer.id ? updated : p)); setSelectedProducer(updated); try { await upsertProducer(updated); } catch (err) { console.error(err); alert('Error al restaurar el socio'); } } } else { if (confirm(`¿Desea dar de baja (archivar) al socio "${selectedProducer.name}"?\n\nEl socio se archivará pero NO se eliminará de la base de datos. Podrá restaurarlo más tarde.`)) { const updated = { ...selectedProducer, status: ProducerStatus.ARCHIVED }; setProducers(prev => prev.map(p => p.id === selectedProducer.id ? updated : p)); setSelectedProducer(updated); try { await upsertProducer(updated); } catch (err) { console.error(err); alert('Error al archivar el socio'); } } } }} onDelete={async () => { if (confirm(`⚠️ ATENCIÓN: ¿Desea ELIMINAR DEFINITIVAMENTE al socio "${selectedProducer.name}"?\n\nEsta acción NO SE PUEDE DESHACER. El socio será borrado permanentemente de la base de datos.`)) { try { const { data, error } = await supabase.from('producers').delete().eq('id', selectedProducer.id); if (error) throw error; setProducers(prev => prev.filter(p => p.id !== selectedProducer.id)); setSelectedProducer(null); alert('Socio eliminado definitivamente'); } catch (err) { console.error(err); alert('Error al eliminar el socio'); } } }} appConfig={appConfig} />; return <ProducersList producers={producers} onSelect={setSelectedProducer} />;
+      case 'producers': if (selectedProducer) return <ProducerDetail producer={selectedProducer} vales={vales} onBack={() => setSelectedProducer(null)} onViewVale={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onEdit={() => { setEditingProducer(selectedProducer); setShowProducerForm(true); }} onArchive={async () => { if (selectedProducer.status === ProducerStatus.ARCHIVED) { if (confirm(`¿Desea restaurar al socio "${selectedProducer.name}"?`)) { const updated = { ...selectedProducer, status: ProducerStatus.ACTIVE }; setProducers(prev => prev.map(p => p.id === selectedProducer.id ? updated : p)); setSelectedProducer(updated); try { await upsertProducer(updated); } catch (err) { console.error(err); alert('Error al restaurar el socio'); } } } else { if (confirm(`¿Desea dar de baja (archivar) al socio "${selectedProducer.name}"?\n\nEl socio se archivará pero NO se eliminará de la base de datos. Podrá restaurarlo más tarde.`)) { const updated = { ...selectedProducer, status: ProducerStatus.ARCHIVED }; setProducers(prev => prev.map(p => p.id === selectedProducer.id ? updated : p)); setSelectedProducer(updated); try { await upsertProducer(updated); } catch (err) { console.error(err); alert('Error al archivar el socio'); } } } }} onDelete={async () => { if (confirm(`⚠️ ATENCIÓN: ¿Desea ELIMINAR DEFINITIVAMENTE al socio "${selectedProducer.name}"?\n\nEsta acción NO SE PUEDE DESHACER. El socio será borrado permanentemente de la base de datos.`)) { try { const { error } = await deleteProducer(selectedProducer.id); if (error) throw error; setProducers(prev => prev.filter(p => p.id !== selectedProducer.id)); setSelectedProducer(null); alert('Socio eliminado definitivamente'); } catch (err) { console.error(err); alert('Error al eliminar el socio'); } } }}
+        appConfig={appConfig} />; return <ProducersList producers={producers} onSelect={setSelectedProducer} />;
       case 'customers': if (selectedCustomer) return <CustomerDetail customer={selectedCustomer} oilExits={fExits} vales={vales} salesOrders={fSales} pomaceExits={pomaceExits} onBack={() => setSelectedCustomer(null)} onEdit={() => { setEditingCustomer(selectedCustomer); setShowCustomerForm(true); }} onArchive={async () => { if (selectedCustomer.status === CustomerStatus.ARCHIVED) { if (confirm(`¿Desea restaurar al cliente "${selectedCustomer.name}"?`)) { const updated = { ...selectedCustomer, status: CustomerStatus.ACTIVE }; setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? updated : c)); setSelectedCustomer(updated); try { await upsertCustomer(updated); } catch (err) { console.error(err); alert('Error al restaurar el cliente'); } } } else { if (confirm(`¿Desea archivar al cliente "${selectedCustomer.name}"?\n\nEl cliente se archivará pero mantendrá todo su historial disponible para consultas. Dejará de aparecer en listados activos y desplegables.`)) { const updated = { ...selectedCustomer, status: CustomerStatus.ARCHIVED }; setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? updated : c)); setSelectedCustomer(updated); try { await upsertCustomer(updated); } catch (err) { console.error(err); alert('Error al archivar el cliente'); } } } }} onDelete={() => { alert('Los clientes no se pueden eliminar definitivamente. Use la opción "Archivar" para ocultarlos de los listados activos.'); }} />; return <CustomersList customers={customers} onSelect={setSelectedCustomer} />;
       case 'vales': return <ValesList vales={fVales} onEdit={(v) => { setEditingVale(v); setIsValeReadOnly(false); setShowValesForm(true); }} onView={(v) => { setTraceSearchTerm(String(v.id_vale)); setActiveTab('traceability'); }} onViewProducer={(name) => { const p = producers.find(x => x.name === name); if (p) { setSelectedProducer(p); setActiveTab('producers'); } }} onUpdateAnalitica={() => { }} />;
       case 'milling': return <MillingControl hoppers={hoppers} pendingVales={fVales.filter(v => v.estado === ValeStatus.PENDIENTE || v.estado === 'PENDIENTE' || v.estado === 'Pendiente')} allVales={fVales} tanks={tanks} millingLots={fMilling} productionLots={fProdLots} appConfig={appConfig} initialViewProductionLotId={externalOpenProductionLotId} onViewValeDetails={(v) => { setEditingVale(v); setIsValeReadOnly(true); setShowValesForm(true); }} onViewLotDetail={(lotId) => { setTraceSearchTerm(lotId); setActiveTab('traceability'); }} onProcessLot={async (data) => { const newId = `MT${data.hopperId}/${data.uso}`; if (millingLots.some(lot => lot.id === newId)) return; const activeVales = fVales.filter(v => Number(v.ubicacion_id) === Number(data.hopperId) && Number(v.uso_contador) === Number(data.uso) && (v.estado === ValeStatus.PENDIENTE || v.estado === 'PENDIENTE' || v.estado === 'Pendiente')); const totalKgAceituna = activeVales.reduce((acc, v) => acc + v.kilos_netos, 0); const totalAceiteTeorico = calculateTheoreticalOil(activeVales); const variedadLote = activeVales.length > 0 ? activeVales[0].variedad : OliveVariety.PICUAL; const newLot: MillingLot = { id: newId, almazaraId: getActiveAlmazaraId(), fecha: data.date, tolva_id: data.hopperId, uso_contador: data.uso, kilos_aceituna: totalKgAceituna, kilos_aceite_esperado: totalAceiteTeorico, kilos_aceite_real: data.realOil, deposito_id: data.targetTankId, variedad: variedadLote, vales_ids: activeVales.map(v => v.id_vale), campaign: appConfig.currentCampaign }; setMillingLots([...millingLots, newLot]); const updatedVales = vales.map(v => Number(v.ubicacion_id) === Number(data.hopperId) && Number(v.uso_contador) === Number(data.uso) && v.campaign === appConfig.currentCampaign ? { ...v, milling_lot_id: newLot.id } : v); setVales(updatedVales); try { await upsertMillingLot(newLot); await Promise.all(updatedVales.filter(v => v.milling_lot_id === newLot.id).map(v => upsertVale(v))); } catch (err) { console.error(err); } }} onDayClose={async (data) => {
@@ -1158,43 +1067,6 @@ const App: React.FC = () => {
                     <CalendarRange size={10} /> Campaña: {String(appConfig.currentCampaign)}
                   </span>
 
-                  {/* Indicador de Sincronización Offline */}
-                  <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest border ${isOnline ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
-                    {isOnline ? <Wifi size={10} /> : <WifiOff size={10} />}
-                    {isOnline ? 'Online' : 'Trabajando Offline'}
-                  </div>
-
-                  {pendingCount > 0 && (
-                    <div
-                      className="flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-md bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest animate-pulse relative group cursor-help"
-                      title={syncQueue.get().map(op => `${op.type}: ${op.payload.name || op.payload.id}`).join('\n')}
-                    >
-                      <RefreshCw size={10} className={isSyncing ? 'animate-spin' : ''} />
-                      {pendingCount} Pendientes
-
-                      {/* Tooltip con nombres */}
-                      <div className="absolute top-full mt-2 left-0 bg-black text-white p-2 rounded shadow-xl text-[9px] lowercase opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none border border-white/10">
-                        {syncQueue.get().slice(0, 5).map(op => (
-                          <div key={op.id}>• {op.type.replace('upsert', '')}: {op.payload.name || op.payload.id?.substring(0, 5)}</div>
-                        ))}
-                        {pendingCount > 5 && <div>y {pendingCount - 5} más...</div>}
-                      </div>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm("¿Seguro que quieres limpiar la cola de espera? Se perderán las cosas que no se hayan subido.")) {
-                            syncQueue.clear();
-                            window.location.reload();
-                          }
-                        }}
-                        className="ml-2 hover:bg-white/20 p-0.5 rounded pointer-events-auto"
-                        title="Limpiar cola"
-                      >
-                        <X size={10} />
-                      </button>
-                    </div>
-                  )}
 
                   <button
                     onClick={() => refreshAllData()}

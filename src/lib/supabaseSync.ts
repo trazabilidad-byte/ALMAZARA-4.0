@@ -1,7 +1,6 @@
 
 import { supabase } from './supabase';
-import { Producer, Vale, MillingLot, AppConfig, Tank, Hopper, UserRole, ProducerStatus, ValeStatus, OliveVariety, Customer, ProductionLot, PackagingLot, OilMovement, SalesOrder, PomaceExit, AuxEntry, CustomerStatus, OilExit, NurseTank, FinishedProduct, ValeType } from '../../types';
-import { syncQueue } from './syncQueue';
+import { Producer, Vale, MillingLot, AppConfig, Tank, Hopper, UserRole, ProducerStatus, ValeStatus, OliveVariety, Customer, ProductionLot, PackagingLot, OilMovement, SalesOrder, PomaceExit, AuxEntry, CustomerStatus, OilExit, NurseTank, FinishedProduct, ValeType, ExitType } from '../../types';
 
 export let ALMAZARA_ID = import.meta.env.VITE_ALMAZARA_ID || '';
 
@@ -9,24 +8,6 @@ export const setSyncAlmazaraId = (id: string) => {
     if (id && id !== 'unknown' && id !== 'null') {
         ALMAZARA_ID = id;
         console.log("SupabaseSync: ID de Almazara actualizado a", id);
-    }
-};
-
-// --- HELPERS PARA SINCRONIZACIÓN ---
-
-const wrapUpsert = async (type: any, payload: any, upsertFn: () => Promise<{ error: any }>, skipQueue = false) => {
-    try {
-        const { error } = await upsertFn();
-        if (error) {
-            console.warn(`Error en red para ${type}, encolando...`, error);
-            if (!skipQueue) syncQueue.add({ type, payload });
-            return { error, offline: true };
-        }
-        return { error: null, offline: false };
-    } catch (err) {
-        console.warn(`Fallo crítico de red para ${type}, encolando...`, err);
-        if (!skipQueue) syncQueue.add({ type, payload });
-        return { error: err, offline: true };
     }
 };
 
@@ -50,15 +31,13 @@ export const fetchAppConfig = async (almazaraId?: string): Promise<AppConfig | n
     return data.config as AppConfig;
 };
 
-export const upsertAppConfig = async (config: AppConfig, skipQueue = false) => {
-    return wrapUpsert('upsertAppConfig', config, async () => {
-        const { error } = await supabase.from('app_configs').upsert({
-            almazara_id: config.almazaraId || ALMAZARA_ID,
-            config: config,
-            updated_at: new Date().toISOString()
-        });
-        return { error };
-    }, skipQueue);
+export const upsertAppConfig = async (config: AppConfig) => {
+    const { error } = await supabase.from('app_configs').upsert({
+        almazara_id: config.almazaraId || ALMAZARA_ID,
+        config: config,
+        updated_at: new Date().toISOString()
+    });
+    return { error };
 };
 
 // --- PRODUCTORES ---
@@ -92,37 +71,40 @@ export const fetchProducers = async (almazaraId?: string): Promise<Producer[]> =
     }));
 };
 
-export const upsertProducer = async (producer: Producer, skipQueue = false) => {
+export const upsertProducer = async (producer: Producer) => {
     console.log("📤 Intentando guardar productor en Supabase:", {
         id: producer.id,
         name: producer.name,
         almazaraId: producer.almazaraId || ALMAZARA_ID
     });
 
-    return wrapUpsert('upsertProducer', producer, async () => {
-        const { error } = await supabase.from('producers').upsert({
-            id: producer.id,
-            almazara_id: producer.almazaraId || ALMAZARA_ID,
-            name: producer.name,
-            nif: producer.nif,
-            municipality: producer.municipality,
-            province: producer.province,
-            zip_code: producer.zipCode,
-            address: producer.address,
-            email: producer.email,
-            phone: producer.phone,
-            total_kg_delivered: Number(producer.totalKgDelivered) || 0,
-            status: producer.status
-        });
+    const { error } = await supabase.from('producers').upsert({
+        id: producer.id,
+        almazara_id: producer.almazaraId || ALMAZARA_ID,
+        name: producer.name,
+        nif: producer.nif,
+        municipality: producer.municipality,
+        province: producer.province,
+        zip_code: producer.zipCode,
+        address: producer.address,
+        email: producer.email,
+        phone: producer.phone,
+        total_kg_delivered: Number(producer.totalKgDelivered) || 0,
+        status: producer.status
+    });
 
-        if (error) {
-            console.error("❌ Error guardando productor:", error);
-        } else {
-            console.log("✅ Productor guardado exitosamente en Supabase");
-        }
+    if (error) {
+        console.error("❌ Error guardando productor:", error);
+    } else {
+        console.log("✅ Productor guardado exitosamente en Supabase");
+    }
 
-        return { error };
-    }, skipQueue);
+    return { error };
+};
+
+export const deleteProducer = async (id: string) => {
+    const { error } = await supabase.from('producers').delete().eq('id', id).eq('almazara_id', ALMAZARA_ID);
+    return { error };
 };
 
 // --- VALES ---
@@ -166,37 +148,41 @@ export const fetchVales = async (almazaraId?: string): Promise<Vale[]> => {
     })) as Vale[];
 };
 
-export const upsertVale = async (vale: Vale, skipQueue = false) => {
+export const upsertVale = async (vale: Vale) => {
     console.log("📤 Intentando guardar VALE en Supabase:", {
         id_vale: vale.id_vale,
         id: vale.id,
         estado: vale.estado,
         almazaraId: vale.almazaraId || ALMAZARA_ID
     });
-    return wrapUpsert('upsertVale', vale, async () => {
-        const { error } = await supabase.from('vales').upsert({
-            id: vale.id,
-            almazara_id: vale.almazaraId || ALMAZARA_ID,
-            sequential_id: vale.id_vale,
-            type: vale.tipo_vale === ValeType.MOLTURACION ? 'A_MOLTURACION' : 'B_VENTA_DIRECTA',
-            producer_id: (vale.productor_id && vale.productor_id.length > 20) ? vale.productor_id : null,
-            producer_name: vale.productor_name,
-            parcela: vale.parcela || '',
-            weight_kg: Number(vale.kilos_netos) || 0,
-            fat_percentage: Number(vale.analitica.rendimiento_graso) || 0,
-            acidity: Number(vale.analitica.acidez) || 0,
-            date: vale.fecha_entrada,
-            variety: vale.variedad,
-            status: vale.estado as any,
-            hopper_id: vale.ubicacion_id,
-            usage_count: Number(vale.uso_contador) || 1,
-            milling_lot_id: vale.milling_lot_id || null,
-            campaign: vale.campaign,
-            customer_id: vale.comprador || null,
-            customer_name: vale.comprador_name || null
-        });
-        return { error };
-    }, skipQueue);
+
+    const { error } = await supabase.from('vales').upsert({
+        id: vale.id,
+        almazara_id: vale.almazaraId || ALMAZARA_ID,
+        sequential_id: vale.id_vale,
+        type: vale.tipo_vale === ValeType.MOLTURACION ? 'A_MOLTURACION' : 'B_VENTA_DIRECTA',
+        producer_id: (vale.productor_id && vale.productor_id.length > 20) ? vale.productor_id : null,
+        producer_name: vale.productor_name,
+        parcela: vale.parcela || '',
+        weight_kg: Number(vale.kilos_netos) || 0,
+        fat_percentage: Number(vale.analitica.rendimiento_graso) || 0,
+        acidity: Number(vale.analitica.acidez) || 0,
+        date: vale.fecha_entrada,
+        variety: vale.variedad,
+        status: vale.estado as any,
+        hopper_id: vale.ubicacion_id,
+        usage_count: Number(vale.uso_contador) || 1,
+        milling_lot_id: vale.milling_lot_id || null,
+        campaign: vale.campaign,
+        customer_id: vale.comprador || null,
+        customer_name: vale.comprador_name || null
+    });
+    return { error };
+};
+
+export const deleteVale = async (id: string) => {
+    const { error } = await supabase.from('vales').delete().eq('id', id).eq('almazara_id', ALMAZARA_ID);
+    return { error };
 };
 
 // --- TANQUES ---
@@ -225,28 +211,24 @@ export const fetchTanks = async (almazaraId?: string): Promise<Tank[]> => {
     }));
 };
 
-export const upsertTank = async (tank: Tank, skipQueue = false) => {
-    return wrapUpsert('upsertTank', tank, async () => {
-        const { error } = await supabase.from('tanks').upsert({
-            id: tank.id,
-            almazara_id: tank.almazaraId || ALMAZARA_ID,
-            name: tank.name,
-            max_capacity_kg: tank.maxCapacityKg,
-            current_kg: tank.currentKg,
-            variety: tank.variety_id || '', // Usamos el nombre de variedad
-            cycle_count: tank.cycleCount,
-            status: tank.status || 'FILLING',
-            updated_at: new Date().toISOString()
-        });
-        return { error };
-    }, skipQueue);
+export const upsertTank = async (tank: Tank) => {
+    const { error } = await supabase.from('tanks').upsert({
+        id: tank.id,
+        almazara_id: tank.almazaraId || ALMAZARA_ID,
+        name: tank.name,
+        max_capacity_kg: tank.maxCapacityKg,
+        current_kg: tank.currentKg,
+        variety: tank.variety_id || '', // Usamos el nombre de variedad
+        cycle_count: tank.cycleCount,
+        status: tank.status || 'FILLING',
+        updated_at: new Date().toISOString()
+    });
+    return { error };
 };
 
-export const deleteTank = async (id: number, skipQueue = false) => {
-    return wrapUpsert('deleteTank', { id }, async () => {
-        const { error } = await supabase.from('tanks').delete().eq('id', id).eq('almazara_id', ALMAZARA_ID);
-        return { error };
-    }, skipQueue);
+export const deleteTank = async (id: number) => {
+    const { error } = await supabase.from('tanks').delete().eq('id', id).eq('almazara_id', ALMAZARA_ID);
+    return { error };
 };
 
 // --- TOLVAS ---
@@ -272,23 +254,19 @@ export const fetchHoppers = async (almazaraId?: string): Promise<Hopper[]> => {
     }));
 };
 
-export const upsertHopper = async (hopper: Hopper, skipQueue = false) => {
-    return wrapUpsert('upsertHopper', hopper, async () => {
-        const { error } = await supabase.from('hoppers').upsert({
-            id: hopper.id,
-            almazara_id: hopper.almazaraId || ALMAZARA_ID,
-            name: hopper.name,
-            is_active: hopper.isActive
-        });
-        return { error };
-    }, skipQueue);
+export const upsertHopper = async (hopper: Hopper) => {
+    const { error } = await supabase.from('hoppers').upsert({
+        id: hopper.id,
+        almazara_id: hopper.almazaraId || ALMAZARA_ID,
+        name: hopper.name,
+        is_active: hopper.isActive
+    });
+    return { error };
 };
 
-export const deleteHopper = async (id: number, skipQueue = false) => {
-    return wrapUpsert('deleteHopper', { id }, async () => {
-        const { error } = await supabase.from('hoppers').delete().eq('id', id).eq('almazara_id', ALMAZARA_ID);
-        return { error };
-    }, skipQueue);
+export const deleteHopper = async (id: number) => {
+    const { error } = await supabase.from('hoppers').delete().eq('id', id).eq('almazara_id', ALMAZARA_ID);
+    return { error };
 };
 
 // --- NODRIZA (NURSE TANK) ---
@@ -319,19 +297,17 @@ export const fetchNurseTank = async (almazaraId?: string): Promise<NurseTank | n
     };
 };
 
-export const upsertNurseTank = async (nurseTank: NurseTank, skipQueue = false) => {
-    return wrapUpsert('upsertNurseTank', nurseTank, async () => {
-        const { error } = await supabase.from('nurse_tanks').upsert({
-            almazara_id: nurseTank.almazaraId || ALMAZARA_ID, // PK es almazara_id
-            max_capacity_kg: nurseTank.maxCapacityKg,
-            current_kg: nurseTank.currentKg,
-            last_entry_date: nurseTank.lastEntryDate,
-            last_source_tank_id: nurseTank.lastSourceTankId,
-            current_variety: nurseTank.currentVariety,
-            current_batch_id: nurseTank.currentBatchId
-        });
-        return { error };
-    }, skipQueue);
+export const upsertNurseTank = async (nurseTank: NurseTank) => {
+    const { error } = await supabase.from('nurse_tanks').upsert({
+        almazara_id: nurseTank.almazaraId || ALMAZARA_ID, // PK es almazara_id
+        max_capacity_kg: nurseTank.maxCapacityKg,
+        current_kg: nurseTank.currentKg,
+        last_entry_date: nurseTank.lastEntryDate,
+        last_source_tank_id: nurseTank.lastSourceTankId,
+        current_variety: nurseTank.currentVariety,
+        current_batch_id: nurseTank.currentBatchId
+    });
+    return { error };
 };
 
 // --- LOTES DE MOLTURACIÓN ---
@@ -359,45 +335,53 @@ export const fetchMillingLots = async (almazaraId?: string): Promise<MillingLot[
         deposito_id: 1,
         variedad: (l.variety || 'Picual') as any,
         vales_ids: [],
-        campaign: l.campaign
+        campaign: l.campaign,
+        status: l.status
     }));
 };
 
-export const upsertMillingLot = async (lot: MillingLot, skipQueue = false) => {
-    return wrapUpsert('upsertMillingLot', lot, async () => {
-        const { error } = await supabase.from('milling_lots').upsert({
-            id: lot.id,
-            almazara_id: lot.almazaraId || ALMAZARA_ID,
-            start_date: lot.fecha,
-            hopper_id: lot.tolva_id,
-            total_olives_kg: lot.kilos_aceituna,
-            theoretical_oil_kg: lot.kilos_aceite_esperado,
-            industrial_oil_kg: lot.kilos_aceite_real,
-            variety: lot.variedad,
-            campaign: lot.campaign,
-            status: lot.status || 'ACTIVE'
-        });
-        return { error };
-    }, skipQueue);
+export const upsertMillingLot = async (lot: MillingLot) => {
+    const { error } = await supabase.from('milling_lots').upsert({
+        id: lot.id,
+        almazara_id: lot.almazaraId || ALMAZARA_ID,
+        start_date: lot.fecha,
+        hopper_id: lot.tolva_id,
+        total_olives_kg: lot.kilos_aceituna,
+        theoretical_oil_kg: lot.kilos_aceite_esperado,
+        industrial_oil_kg: lot.kilos_aceite_real,
+        variety: lot.variedad,
+        campaign: lot.campaign,
+        status: lot.status || 'ACTIVE'
+    });
+    return { error };
 };
 
-export const upsertCustomer = async (customer: Customer, skipQueue = false) => {
-    return wrapUpsert('upsertCustomer', customer, async () => {
-        const { error } = await supabase.from('customers').upsert({
-            id: customer.id,
-            almazara_id: customer.almazaraId || ALMAZARA_ID,
-            name: customer.name,
-            cif: customer.cif,
-            address: customer.address,
-            province: customer.province,
-            zip_code: customer.zipCode,
-            phone: customer.phone,
-            email: customer.email,
-            type: customer.type as any,
-            status: customer.status === 'Activo' ? 'ACTIVE' : 'ARCHIVED'
-        });
-        return { error };
-    }, skipQueue);
+export const deleteMillingLot = async (id: string) => {
+    const { error } = await supabase.from('milling_lots').delete().eq('id', id).eq('almazara_id', ALMAZARA_ID);
+    return { error };
+};
+
+
+export const upsertCustomer = async (customer: Customer) => {
+    const { error } = await supabase.from('customers').upsert({
+        id: customer.id,
+        almazara_id: customer.almazaraId || ALMAZARA_ID,
+        name: customer.name,
+        cif: customer.cif,
+        address: customer.address,
+        province: customer.province,
+        zip_code: customer.zipCode,
+        phone: customer.phone,
+        email: customer.email,
+        type: customer.type as any,
+        status: customer.status === 'Activo' ? 'ACTIVE' : 'ARCHIVED'
+    });
+    return { error };
+};
+
+export const deleteCustomer = async (id: string) => {
+    const { error } = await supabase.from('customers').delete().eq('id', id).eq('almazara_id', ALMAZARA_ID);
+    return { error };
 };
 
 // --- CLIENTES ---
@@ -454,21 +438,19 @@ export const fetchProductionLots = async (almazaraId?: string): Promise<Producti
     }));
 };
 
-export const upsertProductionLot = async (lot: ProductionLot, skipQueue = false) => {
-    return wrapUpsert('upsertProductionLot', lot, async () => {
-        const { error } = await supabase.from('production_lots').upsert({
-            id: lot.id,
-            almazara_id: lot.almazaraId || ALMAZARA_ID,
-            date: lot.fecha,
-            milling_lots_ids: lot.millingLotsIds,
-            total_olive_kg: lot.totalOliveKg,
-            total_real_oil_kg: lot.totalRealOilKg,
-            target_tank_id: lot.targetTankId,
-            notes: lot.notes,
-            campaign: lot.campaign
-        });
-        return { error };
-    }, skipQueue);
+export const upsertProductionLot = async (lot: ProductionLot) => {
+    const { error } = await supabase.from('production_lots').upsert({
+        id: lot.id,
+        almazara_id: lot.almazaraId || ALMAZARA_ID,
+        date: lot.fecha,
+        milling_lots_ids: lot.millingLotsIds,
+        total_olive_kg: lot.totalOliveKg,
+        total_real_oil_kg: lot.totalRealOilKg,
+        target_tank_id: lot.targetTankId,
+        notes: lot.notes,
+        campaign: lot.campaign
+    });
+    return { error };
 };
 
 // --- LOTES DE ENVASADO ---
@@ -502,26 +484,24 @@ export const fetchPackagingLots = async (almazaraId?: string): Promise<Packaging
     }));
 };
 
-export const upsertPackagingLot = async (lot: PackagingLot, skipQueue = false) => {
-    return wrapUpsert('upsertPackagingLot', lot, async () => {
-        const { error } = await supabase.from('packaging_lots').upsert({
-            id: lot.id,
-            almazara_id: lot.almazaraId || ALMAZARA_ID,
-            date: lot.date,
-            type: lot.type,
-            format: lot.format,
-            units: lot.units,
-            liters_used: lot.litersUsed,
-            kg_used: lot.kgUsed,
-            bottle_batch: lot.bottleBatch,
-            cap_batch: lot.capBatch,
-            label_batch: lot.labelBatch,
-            source_info: lot.sourceInfo,
-            source_tank_id: lot.sourceTankId,
-            campaign: lot.campaign
-        });
-        return { error };
-    }, skipQueue);
+export const upsertPackagingLot = async (lot: PackagingLot) => {
+    const { error } = await supabase.from('packaging_lots').upsert({
+        id: lot.id,
+        almazara_id: lot.almazaraId || ALMAZARA_ID,
+        date: lot.date,
+        type: lot.type,
+        format: lot.format,
+        units: lot.units,
+        liters_used: lot.litersUsed,
+        kg_used: lot.kgUsed,
+        bottle_batch: lot.bottleBatch,
+        cap_batch: lot.capBatch,
+        label_batch: lot.labelBatch,
+        source_info: lot.sourceInfo,
+        source_tank_id: lot.sourceTankId,
+        campaign: lot.campaign
+    });
+    return { error };
 };
 
 // --- PRODUCTOS TERMINADOS (STOCK) ---
@@ -547,18 +527,16 @@ export const fetchFinishedProducts = async (almazaraId?: string): Promise<Finish
     }));
 };
 
-export const upsertFinishedProduct = async (product: FinishedProduct, skipQueue = false) => {
-    return wrapUpsert('upsertFinishedProduct', product, async () => {
-        const { error } = await supabase.from('finished_products').upsert({
-            id: product.id,
-            almazara_id: product.almazaraId || ALMAZARA_ID,
-            lot_id: product.lotId,
-            format: product.format,
-            type: product.type,
-            units_available: product.unitsAvailable
-        });
-        return { error };
-    }, skipQueue);
+export const upsertFinishedProduct = async (product: FinishedProduct) => {
+    const { error } = await supabase.from('finished_products').upsert({
+        id: product.id,
+        almazara_id: product.almazaraId || ALMAZARA_ID,
+        lot_id: product.lotId,
+        format: product.format,
+        type: product.type,
+        units_available: product.unitsAvailable
+    });
+    return { error };
 };
 
 // --- MOVIMIENTOS Y AJUSTES ---
@@ -589,26 +567,24 @@ export const fetchOilMovements = async (almazaraId?: string): Promise<OilMovemen
     }));
 };
 
-export const upsertOilMovement = async (mov: OilMovement, skipQueue = false) => {
-    return wrapUpsert('upsertOilMovement', mov, async () => {
-        const { error } = await supabase.from('oil_movements').upsert({
-            id: mov.id,
-            almazara_id: mov.almazaraId || ALMAZARA_ID,
-            date: mov.date,
-            source_tank_id: mov.source_tank_id,
-            target_tank_id: mov.target_tank_id,
-            kg: mov.kg,
-            variety: mov.variety,
-            operator: mov.operator,
-            campaign: mov.campaign,
-            batch_id: mov.batch_id,
-            closure_details: mov.closureDetails
-        });
-        return { error };
-    }, skipQueue);
+export const upsertOilMovement = async (mov: OilMovement) => {
+    const { error } = await supabase.from('oil_movements').upsert({
+        id: mov.id,
+        almazara_id: mov.almazaraId || ALMAZARA_ID,
+        date: mov.date,
+        source_tank_id: mov.source_tank_id,
+        target_tank_id: mov.target_tank_id,
+        kg: mov.kg,
+        variety: mov.variety,
+        operator: mov.operator,
+        campaign: mov.campaign,
+        batch_id: mov.batch_id,
+        closure_details: mov.closureDetails
+    });
+    return { error };
 };
 
-// --- PEDIDOS DE VENTA ---
+// --- PEDIDOS DE VENTA (Sales Orders) ---
 export const fetchSalesOrders = async (almazaraId?: string): Promise<SalesOrder[]> => {
     const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
@@ -621,35 +597,34 @@ export const fetchSalesOrders = async (almazaraId?: string): Promise<SalesOrder[
         return [];
     }
 
-    return data.map(o => ({
-        id: o.id,
-        almazaraId: o.almazara_id,
-        date: o.date,
-        customerId: o.customer_id,
-        products: o.products,
-        totalAmount: Number(o.total_amount),
-        status: o.status as any,
-        campaign: o.campaign
+    return data.map(s => ({
+        id: s.id,
+        almazaraId: s.almazara_id,
+        date: s.date,
+        customerId: s.customer_id,
+        products: s.lines || [], // Mapeamos lines (DB) a products (UI)
+        totalAmount: Number(s.total_amount),
+        status: s.status as any,
+        campaign: s.campaign
     }));
 };
 
-export const upsertSalesOrder = async (order: SalesOrder, skipQueue = false) => {
-    return wrapUpsert('upsertSalesOrder', order, async () => {
-        const { error } = await supabase.from('sales_orders').upsert({
-            id: order.id,
-            almazara_id: order.almazaraId || ALMAZARA_ID,
-            date: order.date,
-            customer_id: order.customerId,
-            products: order.products,
-            total_amount: order.totalAmount,
-            status: order.status,
-            campaign: order.campaign
-        });
-        return { error };
-    }, skipQueue);
+export const upsertSalesOrder = async (order: SalesOrder) => {
+    const { error } = await supabase.from('sales_orders').upsert({
+        id: order.id,
+        almazara_id: order.almazaraId || ALMAZARA_ID,
+        date: order.date,
+        customer_id: order.customerId,
+        lines: order.products, // UI products -> DB lines
+        total_amount: order.totalAmount,
+        status: order.status,
+        campaign: order.campaign,
+        delivery_note: (order as any).deliveryNote // Añadido por si existe en el payload
+    });
+    return { error };
 };
 
-// --- SALIDAS DE ORUJO ---
+// --- SALIDAS DE ORUJO (Pomace Exits) ---
 export const fetchPomaceExits = async (almazaraId?: string): Promise<PomaceExit[]> => {
     const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
@@ -662,35 +637,34 @@ export const fetchPomaceExits = async (almazaraId?: string): Promise<PomaceExit[
         return [];
     }
 
-    return data.map(e => ({
-        id: e.id,
-        almazaraId: e.almazara_id,
-        date: e.date,
-        customerId: e.customer_id,
-        kg: Number(e.kg),
-        valeNumber: e.vale_number,
-        notes: e.notes,
-        campaign: e.campaign
+    return data.map(p => ({
+        id: p.id,
+        almazaraId: p.almazara_id,
+        date: p.date,
+        kg: Number(p.kg),
+        customerId: p.destination, // Asumimos destination es customerId en DB
+        valeNumber: p.vehicle_plate || '', // Asumimos vehicle_plate es valeNumber
+        notes: p.notes,
+        campaign: p.campaign
     }));
 };
 
-export const upsertPomaceExit = async (exit: PomaceExit, skipQueue = false) => {
-    return wrapUpsert('upsertPomaceExit', exit, async () => {
-        const { error } = await supabase.from('pomace_exits').upsert({
-            id: exit.id,
-            almazara_id: exit.almazaraId || ALMAZARA_ID,
-            date: exit.date,
-            customer_id: exit.customerId,
-            kg: exit.kg,
-            vale_number: exit.valeNumber,
-            notes: exit.notes,
-            campaign: exit.campaign
-        });
-        return { error };
-    }, skipQueue);
+export const upsertPomaceExit = async (exit: PomaceExit) => {
+    const { error } = await supabase.from('pomace_exits').upsert({
+        id: exit.id,
+        almazara_id: exit.almazaraId || ALMAZARA_ID,
+        date: exit.date,
+        kg: exit.kg,
+        destination: exit.customerId,
+        vehicle_plate: exit.valeNumber,
+        notes: exit.notes,
+        campaign: exit.campaign
+    });
+    return { error };
 };
 
-// --- ENTRADAS AUXILIARES ---
+
+// --- AUXILIARES (Aux Entries) ---
 export const fetchAuxEntries = async (almazaraId?: string): Promise<AuxEntry[]> => {
     const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
@@ -708,32 +682,31 @@ export const fetchAuxEntries = async (almazaraId?: string): Promise<AuxEntry[]> 
         almazaraId: e.almazara_id,
         date: e.date,
         supplier: e.supplier,
-        materialType: e.material_type,
+        materialType: e.product_name || '',
         quantity: Number(e.quantity),
-        manufacturerBatch: e.manufacturer_batch,
-        pricePerUnit: Number(e.price_per_unit),
+        manufacturerBatch: '', // Fallback si no hay en DB
+        pricePerUnit: 0, // Fallback si no hay en DB
         campaign: e.campaign
     }));
 };
 
-export const upsertAuxEntry = async (entry: AuxEntry, skipQueue = false) => {
-    return wrapUpsert('upsertAuxEntry', entry, async () => {
-        const { error } = await supabase.from('aux_entries').upsert({
-            id: entry.id,
-            almazara_id: entry.almazaraId || ALMAZARA_ID,
-            date: entry.date,
-            supplier: entry.supplier,
-            material_type: entry.materialType,
-            quantity: entry.quantity,
-            manufacturer_batch: entry.manufacturerBatch,
-            price_per_unit: entry.pricePerUnit,
-            campaign: entry.campaign
-        });
-        return { error };
-    }, skipQueue);
+export const upsertAuxEntry = async (entry: AuxEntry) => {
+    const { error } = await supabase.from('aux_entries').upsert({
+        id: entry.id,
+        almazara_id: entry.almazaraId || ALMAZARA_ID,
+        date: entry.date,
+        product_id: (entry as any).productId || null,
+        product_name: entry.materialType,
+        quantity: entry.quantity,
+        units: (entry as any).units || 'u',
+        supplier: entry.supplier,
+        notes: (entry as any).notes || '',
+        campaign: entry.campaign
+    });
+    return { error };
 };
 
-// --- SALIDAS DE ACEITE (BULK/EXIT) ---
+// --- SALIDAS DE ACEITE (Oil Exits - Venta a Granel) ---
 export const fetchOilExits = async (almazaraId?: string): Promise<OilExit[]> => {
     const id = almazaraId || ALMAZARA_ID;
     const { data, error } = await supabase
@@ -746,165 +719,84 @@ export const fetchOilExits = async (almazaraId?: string): Promise<OilExit[]> => 
         return [];
     }
 
-    return data.map(e => ({
-        id: e.id,
-        almazaraId: e.almazara_id,
-        tank_id: e.tank_id,
-        type: e.type as any,
-        date: e.date,
-        kg: Number(e.kg),
-        kg_after_exit: Number(e.kg_after_exit),
-        customer_id: e.customer_id,
-        driver_name: e.driver_name,
-        license_plate: e.license_plate,
-        seals: e.seals,
-        campaign: e.campaign,
-        deliveryNote: e.delivery_note
+    return data.map(o => ({
+        id: o.id,
+        almazaraId: o.almazara_id,
+        tank_id: o.tank_id || 0,
+        type: (o.type as ExitType) || ExitType.CISTERNA,
+        date: o.date,
+        kg: o.kg || 0,
+        kg_after_exit: o.kg_after_exit || 0,
+        customer_id: o.customer_id,
+        vale_number: o.vale_number,
+        driver_name: o.driver_name,
+        license_plate: o.license_plate,
+        seals: o.seals,
+        deliveryNote: o.delivery_note,
+        campaign: o.campaign
     }));
 };
 
-export const upsertOilExit = async (exit: OilExit, skipQueue = false) => {
-    return wrapUpsert('upsertOilExit', exit, async () => {
-        const { error } = await supabase.from('oil_exits').upsert({
-            id: exit.id,
-            almazara_id: exit.almazaraId || ALMAZARA_ID,
-            tank_id: exit.tank_id,
-            type: exit.type,
-            date: exit.date,
-            kg: exit.kg,
-            kg_after_exit: exit.kg_after_exit,
-            customer_id: exit.customer_id,
-            driver_name: exit.driver_name,
-            license_plate: exit.license_plate,
-            seals: exit.seals,
-            campaign: exit.campaign,
-            delivery_note: exit.deliveryNote
-        });
-        return { error };
-    }, skipQueue);
-};
-// --- FUNCIONES DE BORRADO ---
-
-export const deleteVale = async (id: string) => {
-    const { error } = await supabase.from('vales').delete().eq('id', id);
+export const upsertOilExit = async (exit: OilExit) => {
+    const { error } = await supabase.from('oil_exits').upsert({
+        id: exit.id,
+        almazara_id: exit.almazaraId || ALMAZARA_ID,
+        tank_id: exit.tank_id,
+        type: exit.type,
+        date: exit.date,
+        kg: exit.kg,
+        kg_after_exit: exit.kg_after_exit,
+        customer_id: exit.customer_id,
+        vale_number: exit.vale_number,
+        driver_name: exit.driver_name,
+        license_plate: exit.license_plate,
+        seals: exit.seals,
+        delivery_note: exit.deliveryNote,
+        campaign: exit.campaign
+    });
     return { error };
 };
 
-export const deleteMillingLot = async (id: string) => {
-    const { error } = await supabase.from('milling_lots').delete().eq('id', id);
-    return { error };
-};
+// --- RESET DE DATOS ---
+export const resetAlmazaraData = async (almazaraId?: string) => {
+    // ESTA FUNCIÓN ES NUCLEAR - BORRADO TOTAL
+    const id = almazaraId || ALMAZARA_ID;
 
-export const deleteProductionLot = async (id: string) => {
-    const { error } = await supabase.from('production_lots').delete().eq('id', id);
-    return { error };
-};
+    // 1. Borrar Tablas
+    await supabase.from('vales').delete().eq('almazara_id', id);
+    await supabase.from('milling_lots').delete().eq('almazara_id', id);
+    await supabase.from('production_lots').delete().eq('almazara_id', id);
+    await supabase.from('packaging_lots').delete().eq('almazara_id', id);
+    await supabase.from('oil_movements').delete().eq('almazara_id', id);
+    await supabase.from('sales_orders').delete().eq('almazara_id', id);
+    await supabase.from('pomace_exits').delete().eq('almazara_id', id);
+    await supabase.from('oil_exits').delete().eq('almazara_id', id);
+    await supabase.from('finished_products').delete().eq('almazara_id', id);
 
-export const deletePackagingLot = async (id: string) => {
-    const { error } = await supabase.from('packaging_lots').delete().eq('id', id);
-    return { error };
-};
-
-export const deleteFinishedProduct = async (id: string) => {
-    const { error } = await supabase.from('finished_products').delete().eq('id', id);
-    return { error };
-};
-
-export const deleteOilMovement = async (id: string) => {
-    const { error } = await supabase.from('oil_movements').delete().eq('id', id);
-    return { error };
-};
-
-export const deleteSalesOrder = async (id: string) => {
-    const { error } = await supabase.from('sales_orders').delete().eq('id', id);
-    return { error };
-};
-
-export const deletePomaceExit = async (id: string) => {
-    const { error } = await supabase.from('pomace_exits').delete().eq('id', id);
-    return { error };
-};
-
-export const deleteAuxEntry = async (id: string) => {
-    const { error } = await supabase.from('aux_entries').delete().eq('id', id);
-    return { error };
-};
-
-export const deleteOilExit = async (id: string) => {
-    const { error } = await supabase.from('oil_exits').delete().eq('id', id);
-    return { error };
-};
-
-export const resetAlmazaraData = async () => {
-    console.log("☢️ INICIANDO NUCLEAR RESET V3 (FINAL)...");
-    const almazaraId = ALMAZARA_ID;
-
-    // Helper para borrar ignorando errores 404/FK momentáneos (reintentaremos)
-    const safeDelete = async (table: string, label: string) => {
-        try {
-            console.log(`🗑️ Eliminando ${label}...`);
-            const { error } = await supabase.from(table).delete().eq('almazara_id', almazaraId);
-            if (error) console.error(`❌ Error borrando ${table}:`, error.message);
-            else console.log(`✅ ${table} limpios.`);
-        } catch (e) {
-            console.error(`💥 Excepción en ${table}:`, e);
+    // 2. Resetear Tanques a 0
+    // No borramos los tanques, solo los ponemos a 0
+    const { data: tanks } = await supabase.from('tanks').select('id').eq('almazara_id', id);
+    if (tanks) {
+        for (const t of tanks) {
+            await supabase.from('tanks').update({
+                current_kg: 0,
+                status: 'FILLING',
+                current_batch_id: null,
+                variety: ''
+            }).eq('id', t.id);
         }
-    };
-
-    try {
-        // 1. DESVINCULAR TODO (Romper FKs circulares)
-        console.log("🔄 1. Desvinculando referencias...");
-        // Vales -> Lotes
-        await supabase.from('vales').update({ milling_lot_id: null, productor_id: null, comprador: null }).eq('almazara_id', almazaraId);
-        // Depósitos -> Lotes
-        await supabase.from('tanks').update({ current_batch_id: null, variety_id: null }).eq('almazara_id', almazaraId);
-        // Movimientos -> Lotes (si hubiera FK directa, nulificarla)
-
-        // 2. BORRADO EN CASCADA MANUAL (Hijos -> Padres)
-
-        // Nivel 0: Salidas y Entradas Aux (Hojas)
-        await safeDelete('oil_exits', 'Salidas de Aceite');
-        await safeDelete('pomace_exits', 'Salidas de Orujo');
-        await safeDelete('aux_entries', 'Entradas Auxiliares');
-        await safeDelete('sales_orders', 'Pedidos de Venta');
-        await safeDelete('finished_products', 'Productos Terminados');
-        await safeDelete('packaging_lots', 'Lotes de Envasado');
-
-        // Nivel 1: Movimientos (Dependen de Tanques y Lotes)
-        await safeDelete('oil_movements', 'Movimientos de Aceite');
-
-        // Nivel 2: Lotes de Producción (Dependen de Lotes Molturación)
-        // OJO: Si hay FK array, no importa, pero si hay tabla intermedia, borrarla.
-        await safeDelete('production_lots', 'Lotes de Producción');
-
-        // Nivel 3: Lotes de Molturación (Ahora deberían estar libres)
-        await safeDelete('milling_lots', 'Lotes de Molturación');
-
-        // Nivel 4: Vales (Referencian a Productores/Clientes/Lotes - ya desvinculados)
-        await safeDelete('vales', 'Vales de Recepción (TODOS)');
-
-        // Nivel 5: Maestros (Productores y Clientes)
-        await safeDelete('customers', 'Clientes');
-        await safeDelete('producers', 'Productores');
-
-        // 3. RESET DE ESTADO (Tanques y Maquinaria)
-        console.log("🔄 3. Reseteando Maquinaria...");
-        await supabase.from('tanks').update({
-            current_kg: 0,
-            status: 'FILLING',
-            current_batch_id: null,
-            variety: null, // String variety
-            variety_id: null,
-            cycle_count: 0
-        }).eq('almazara_id', almazaraId);
-
-        await supabase.from('hoppers').update({ current_use: 1 }).eq('almazara_id', almazaraId);
-        await supabase.from('nurse_tanks').update({ current_kg: 0, current_batch_id: null, current_variety: null }).eq('almazara_id', almazaraId);
-
-        console.log("✅✅ NUCLEAR RESET COMPLETADO.");
-        return { success: true };
-    } catch (err) {
-        console.error("❌ ERROR CRÍTICO EN RESET (V3):", err);
-        return { error: err };
     }
+
+    // 3. Resetear Nodriza
+    await supabase.from('nurse_tanks').update({
+        current_kg: 0,
+        current_batch_id: null,
+        current_variety: ''
+    }).eq('almazara_id', id);
+
+    return { error: null };
 };
+
+export const resetCampaignData = async (almazaraId?: string) => {
+    return resetAlmazaraData(almazaraId);
+}

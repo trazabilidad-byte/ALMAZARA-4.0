@@ -769,6 +769,17 @@ export const SettingsDashboard: React.FC<SettingsDashboardProps> = ({
                                         <input type="text" value={formConfig.province} onChange={e => setFormConfig({ ...formConfig, province: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-bold text-[#111111] outline-none" />
                                     </div>
                                 </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-[#D9FF66] bg-black px-2 py-0.5 rounded uppercase tracking-widest inline-block mb-1">Campaña Activa</label>
+                                    <input
+                                        type="text"
+                                        value={formConfig.currentCampaign}
+                                        onChange={e => setFormConfig({ ...formConfig, currentCampaign: e.target.value })}
+                                        className="w-full bg-black text-[#D9FF66] border border-gray-800 rounded-xl px-4 py-3 font-mono font-bold outline-none placeholder:text-gray-700"
+                                        placeholder="Ej: 2025/2026"
+                                    />
+                                    <p className="text-[10px] text-gray-400 mt-1 italic">Este nombre se asignará a todos los nuevos registros (Vales, Lotes, etc.)</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1240,26 +1251,35 @@ export const SettingsDashboard: React.FC<SettingsDashboardProps> = ({
                         </div>
 
 
-                        <div className="bg-[#111111] text-white p-6 rounded-[32px] mt-6 border border-gray-800">
-                            <h4 className="font-bold text-red-400 mb-2 uppercase text-xs tracking-widest">Zona de Peligro / Debug</h4>
-                            <p className="text-xs text-gray-400 mb-4">Si tienes problemas de sincronización (cola atascada), usa este botón.</p>
-                            <button
-                                onClick={() => {
-                                    localStorage.removeItem('almazara_sync_queue');
-                                    window.location.reload();
-                                }}
-                                className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-xl font-bold uppercase text-xs tracking-widest transition-all mb-4"
-                            >
-                                Limpiar Cola de Sincronización
-                            </button>
+                        <div className="bg-red-50 border border-red-200 p-8 rounded-[32px] mt-6">
+                            <h4 className="font-black text-red-600 mb-2 uppercase text-sm tracking-wider flex items-center gap-2">
+                                <AlertOctagon size={18} /> Zona de Alta Peligrosidad
+                            </h4>
+                            <p className="text-xs text-red-800 font-medium mb-6 leading-relaxed">
+                                Use esta opción <strong>SOLO</strong> cuando vaya a empezar una nueva campaña o necesite purgar todos los datos de prueba.
+                                <br /><br />
+                                <strong>ALERTA:</strong> Esta acción borrará todas las transacciones (Vales, Lotes, Ventas, Stock) del servidor y reiniciará su copia local.
+                                <br />Productores y Clientes <strong>serán conservados</strong>.
+                            </p>
 
-                            <h4 className="font-bold text-red-500 mb-2 uppercase text-[10px] tracking-widest">Reinicio Maestro de Aplicación</h4>
-                            <p className="text-[10px] text-gray-500 mb-4">Usa este botón si necesitas limpiar todos los datos locales y sincronizar de nuevo con el servidor (útil tras borrados manuales en base de datos).</p>
                             <button
                                 onClick={onFullReset}
-                                className="w-full py-3 bg-red-900/40 hover:bg-red-900/60 text-red-200 border border-red-800/50 rounded-xl font-bold uppercase text-xs tracking-widest transition-all"
+                                className="w-full py-5 bg-red-600 hover:bg-red-700 text-white rounded-[20px] font-black uppercase text-sm tracking-widest transition-all shadow-xl shadow-red-600/20 flex items-center justify-center gap-3"
                             >
-                                <RefreshCw size={14} className="inline mr-2" /> Forzar Reinicio de Datos
+                                <RefreshCw size={20} className="animate-spin-slow" />
+                                Reiniciar para Nueva Campaña
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    if (confirm('¿Desea limpiar solo la cola de sincronización (cache local)?\nNo se borrarán datos del servidor.')) {
+                                        localStorage.removeItem('almazara_sync_queue');
+                                        window.location.reload();
+                                    }
+                                }}
+                                className="w-full mt-4 py-3 text-red-400 font-bold uppercase text-[10px] tracking-widest hover:text-red-600 transition-colors"
+                            >
+                                Limpiar Cache Local (Cola Sync)
                             </button>
                         </div>
                     </div>
