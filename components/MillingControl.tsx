@@ -322,8 +322,9 @@ export const MillingControl: React.FC<MillingControlProps> = ({
                                         <div>
                                             <div className="flex justify-between items-end mb-1">
                                                 <h3 className="text-2xl font-black text-[#111111] uppercase tracking-tighter">{hopper.activeBatch.variety}</h3>
-                                                <span className="text-xs font-black bg-gray-100 text-gray-600 px-2 py-1 rounded uppercase">
-                                                    Lote {hopper.id}/{hopper.activeBatch.uso}
+                                                <span className="text-xs font-black bg-[#111111] text-white px-3 py-1 rounded uppercase flex items-center gap-2">
+                                                    <div className="w-1.5 h-1.5 bg-[#D9FF66] rounded-full"></div>
+                                                    T{hopper.id} / USO {hopper.activeBatch.uso}
                                                 </span>
                                             </div>
 
@@ -332,8 +333,8 @@ export const MillingControl: React.FC<MillingControlProps> = ({
                                                 {hopper.activeBatch.vales.map(v => (
                                                     <button
                                                         key={v.id_vale}
-                                                        onClick={() => onViewValeDetails(v)}
-                                                        className="px-2 py-1 bg-white border border-gray-300 rounded text-[10px] font-bold text-[#111111] hover:bg-black hover:text-[#D9FF66] hover:border-black transition-colors"
+                                                        onClick={(e) => { e.stopPropagation(); onViewValeDetails(v); }}
+                                                        className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-[10px] font-black text-[#111111] hover:bg-black hover:text-[#D9FF66] hover:border-black transition-all shadow-sm active:scale-95"
                                                     >
                                                         #{v.id_vale}
                                                     </button>
@@ -379,8 +380,8 @@ export const MillingControl: React.FC<MillingControlProps> = ({
                                         {hopper.queuedBatches.map(batch => (
                                             <div key={batch.uso} className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-black bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
-                                                        #{batch.uso}
+                                                    <span className="text-[10px] font-black bg-[#111111] px-2 py-0.5 rounded text-[#D9FF66]">
+                                                        USO #{batch.uso}
                                                     </span>
                                                     <span className="text-xs font-bold text-[#111111] uppercase">{batch.variety}</span>
                                                 </div>

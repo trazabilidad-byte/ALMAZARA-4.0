@@ -438,7 +438,7 @@ export const ValesForm: React.FC<ValesFormProps> = ({
                                     </div>
                                     <div className="flex flex-col items-end gap-1 ml-auto">
                                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
-                                            IDENTIFICADOR USO
+                                            TURNO / LOTE TOLVA (PARA AGRUPAR)
                                         </p>
                                         <div className="flex items-center gap-1">
                                             <span className="text-5xl font-black text-[#D9FF66] tracking-tighter leading-none">

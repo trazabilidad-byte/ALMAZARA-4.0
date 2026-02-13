@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Tank, Hopper, Vale, MillingLot, AppConfig, AuxStock, SalesOrder, ValeType, Producer, OilMovement, OilExit, ExitType, ProductionLot } from '../types';
+import { Tank, Hopper, Vale, MillingLot, AppConfig, AuxStock, SalesOrder, ValeType, ValeStatus, Producer, OilMovement, OilExit, ExitType, ProductionLot } from '../types';
 
 import { KPICard } from './KPICard';
 import { TankGrid } from './TankGrid';
@@ -133,12 +133,14 @@ export const DynamicDashboard: React.FC<DynamicDashboardProps> = ({
         return { totalTeorico, totalReal, diff, deviationPercent };
     }, [millingLots, timeFilter]);
 
-    const pendingVales = useMemo(() => vales.filter(v => v.estado === 'Pendiente'), [vales]);
+    const pendingVales = useMemo(() => vales.filter(v =>
+        v.estado === ValeStatus.PENDIENTE || v.estado === 'PENDIENTE' || v.estado === 'Pendiente'
+    ), [vales]);
 
     const activeHoppersData = useMemo(() => {
         return hoppers.map(h => {
             const hopperVales = vales.filter(v =>
-                v.estado === 'Pendiente' &&
+                (v.estado === ValeStatus.PENDIENTE || v.estado === 'PENDIENTE' || v.estado === 'Pendiente') &&
                 Number(v.ubicacion_id) === Number(h.id) &&
                 v.tipo_vale === ValeType.MOLTURACION &&
                 !v.milling_lot_id
@@ -191,8 +193,11 @@ export const DynamicDashboard: React.FC<DynamicDashboardProps> = ({
         const now = new Date();
         const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD local
         return vales.filter(v => {
-            const isDateToday = v.fecha_entrada.startsWith(todayStr);
-            const isCreatedToday = v.created_at && new Date(v.created_at).toDateString() === now.toDateString();
+            // Comparación robusta por string de fecha local
+            const vDate = new Date(v.fecha_entrada);
+            const vDateStr = vDate.toLocaleDateString('en-CA');
+            const isDateToday = vDateStr === todayStr;
+            const isCreatedToday = v.created_at && new Date(v.created_at).toLocaleDateString('en-CA') === todayStr;
             return isDateToday || isCreatedToday;
         });
     }, [vales]);
@@ -303,7 +308,7 @@ export const DynamicDashboard: React.FC<DynamicDashboardProps> = ({
                                     )}
                                 </div>
                                 <span className={`${hopper.status === 'active' ? 'bg-[#111111] text-white' : 'bg-gray-200 text-gray-400'} px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest`}>
-                                    {hopper.status === 'active' ? `Lote MT ${hopper.id}/${hopper.activeBatch?.uso}` : 'Inactiva'}
+                                    {hopper.status === 'active' ? `T${hopper.id} / USO ${hopper.activeBatch?.uso}` : 'Inactiva'}
                                 </span>
                             </div>
 
@@ -317,7 +322,7 @@ export const DynamicDashboard: React.FC<DynamicDashboardProps> = ({
                                         {hopper.queuedBatches.length > 0 && (
                                             <div className="flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100">
                                                 <Layers size={14} className="text-amber-600" />
-                                                <span className="text-[10px] font-black text-amber-700 uppercase">+{hopper.queuedBatches.length} En Cola</span>
+                                                <span className="text-[10px] font-black text-amber-700 uppercase">+{hopper.queuedBatches.length} USOS/TURNOS EN COLA</span>
                                             </div>
                                         )}
                                     </div>
