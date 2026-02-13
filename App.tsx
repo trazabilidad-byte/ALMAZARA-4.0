@@ -56,6 +56,8 @@ import {
   upsertAppConfig,
   deleteTank,
   deleteHopper,
+  deleteVale,
+  deleteMillingLot,
   fetchNurseTank,
   upsertNurseTank,
   fetchFinishedProducts,
@@ -252,8 +254,8 @@ const App: React.FC = () => {
   const [externalOpenTankId, setExternalOpenTankId] = useState<number | null>(null);
 
   useEffect(() => {
-    // NUCLEAR OPTION: Limpieza forzada de caché al subir versión
-    const SYS_VERSION = '4.2';
+    // 1. Restaurar Versión y Limpieza
+    const SYS_VERSION = '4.3';
     const storedVersion = localStorage.getItem('sys_version');
 
     if (storedVersion !== SYS_VERSION) {
@@ -263,7 +265,7 @@ const App: React.FC = () => {
         'app_productionLots', 'app_oilExits', 'app_salesOrders',
         'app_pomaceExits', 'app_packagingLots', 'app_finishedProducts',
         'app_auxEntries', 'app_oilMovements', 'app_tanks', 'app_nurseTank',
-        'app_hoppers', 'app_config'
+        'app_hoppers', 'app_config', 'almazara_user'
       ];
       keysToRemove.forEach(k => localStorage.removeItem(k));
       localStorage.setItem('sys_version', SYS_VERSION);
@@ -271,9 +273,34 @@ const App: React.FC = () => {
       return;
     }
 
+    // 2. Restaurar Sesión
+    const savedUser = localStorage.getItem('almazara_user');
+    if (savedUser) {
+      try {
+        const u = JSON.parse(savedUser);
+        if (u && u.id) {
+          setCurrentUser(u);
+          setIsLoggedIn(true);
+          setSyncAlmazaraId(u.almazaraId);
+        }
+      } catch (e) {
+        console.error("Error restaurando sesión:", e);
+      }
+    }
+
     const timer = setTimeout(() => setIsAuthChecking(false), 300);
     return () => clearTimeout(timer);
   }, []);
+
+  // 🆕 SINCRONIZACIÓN PERIÓDICA (Cada 30 segundos)
+  useEffect(() => {
+    if (isLoggedIn && currentUser) {
+      const interval = setInterval(() => {
+        refreshAllData();
+      }, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [isLoggedIn, currentUser]);
 
   const handleLogin = (user: User) => {
     const almazaraId = (user.almazaraId && user.almazaraId !== 'unknown' && user.almazaraId !== 'private-user')
@@ -436,9 +463,18 @@ const App: React.FC = () => {
       (old.id_vale === v.id_vale && old.almazaraId === vAlmazaraId)
     );
 
-    // 2. RECUPERAR NOMBRES SI FALTAN (Protección contra desaparición):
-    const prodName = v.productor_name || producers.find(p => p.id === v.productor_id)?.name || existing?.productor_name || '';
-    const compName = v.comprador_name || (v.comprador ? customers.find(c => c.id === v.comprador)?.name : '') || existing?.comprador_name || '';
+    // 2. RECUPERAR NOMBRES SI FALTAN (Protección crítica contra desaparición):
+    let prodName = v.productor_name || '';
+    if (!prodName && v.productor_id) {
+      prodName = producers.find(p => p.id === v.productor_id)?.name || '';
+    }
+    if (!prodName && existing) prodName = existing.productor_name;
+
+    let compName = v.comprador_name || '';
+    if (!compName && v.comprador) {
+      compName = customers.find(c => c.id === v.comprador)?.name || '';
+    }
+    if (!compName && existing) compName = existing.comprador_name;
 
     // 3. PREPARAR OBJETO PARA GUARDAR:
     const valeToSave: Vale = {
@@ -450,20 +486,15 @@ const App: React.FC = () => {
       comprador_name: compName
     };
 
-    // 3. ACTUALIZACIÓN LOCAL:
-    // 4. ACTUALIZACIÓN LOCAL CON DEDUPLICACIÓN PROACTIVA:
+    // 4. ACTUALIZACIÓN LOCAL CON DEDUPLICACIÓN ESTRICTA:
     setVales(prev => {
-      // Eliminamos cualquier duplicado previo del mismo número de vale pero con diferente ID
+      // 1. Filtrar cualquier vale que tenga el mismo ID 
+      // 2. O el mismo NÚMERO DE VALE (id_vale) pero distinto ID (para evitar duplicados por colisión de números)
       const filtered = prev.filter(old =>
-        !(old.id_vale === valeToSave.id_vale && old.almazaraId === valeToSave.almazaraId && old.id !== valeToSave.id)
+        old.id !== valeToSave.id &&
+        !(old.id_vale === valeToSave.id_vale && old.almazaraId === valeToSave.almazaraId)
       );
 
-      const index = filtered.findIndex(v => v.id === valeToSave.id);
-      if (index !== -1) {
-        const newVales = [...filtered];
-        newVales[index] = valeToSave;
-        return newVales;
-      }
       return [valeToSave, ...filtered];
     });
 
@@ -602,24 +633,27 @@ const App: React.FC = () => {
         return [...merged, ...localsNotInServer];
       };
 
-      if (p) setProducers(prev => getMergedState(p, prev, 'upsertProducer'));
+      // 3. Aplicar datos del servidor sólo si no hay errores (v, p, t no son nulos)
+      if (p && p.length > 0) setProducers(prev => getMergedState(p, prev, 'upsertProducer'));
+
       if (v) setVales(prev => {
+        // Si el servidor no devuelve nada, pero tenemos datos locales, no borramos TODO 
+        // a menos que estemos seguros de que el servidor está vacío intencionadamente.
+        if (v.length === 0 && prev.length > 0) {
+          // Si el servidor está vacío después de un reset, aceptamos el vacío
+          // PERO mantenemos lo que esté en la cola de sincronización.
+        }
+
         const queueOps = syncQueue.get().filter(op => op.type === 'upsertVale');
         const pendingIds = new Set(queueOps.map(op => op.payload.id));
         const pendingLocally = prev.filter(item => pendingIds.has(item.id));
         const serverIds = new Set(v.map(item => item.id));
 
-        // Combinamos servidor + locales pendientes
         const combined = [...v, ...pendingLocally.filter(item => !serverIds.has(item.id))];
-
-        // Deduplicamos por id_vale (Sequential ID) para evitar visualización doble
-        // Damos prioridad a los que tienen cambios pendientes localmente
         const deduplicated = new Map<number, Vale>();
 
-        // 1. Cargamos todos
         combined.forEach(item => {
           const existing = deduplicated.get(item.id_vale);
-          // Si no existe, o si el nuevo está en la cola de pendientes, lo preferimos
           if (!existing || pendingIds.has(item.id)) {
             deduplicated.set(item.id_vale, item);
           }
@@ -627,8 +661,9 @@ const App: React.FC = () => {
 
         return Array.from(deduplicated.values());
       });
-      if (t) setTanks(t);
-      if (h) setHoppers(h);
+
+      if (t && t.length > 0) setTanks(t);
+      if (h && h.length > 0) setHoppers(h);
       if (m) setMillingLots(prev => getMergedState(m, prev, 'upsertMillingLot'));
       if (c) setCustomers(prev => getMergedState(c, prev, 'upsertCustomer'));
       if (pl) setProductionLots(prev => getMergedState(pl, prev, 'upsertProductionLot'));
@@ -667,6 +702,73 @@ const App: React.FC = () => {
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  // Función para resetear TODO (Mantenemos por si se necesita invocar manualmente)
+  const handleFullReset = async () => {
+    if (!window.confirm("¿ESTÁS SEGURO? Esto borrará absolutamente TODO (Ventas, Vales, Lotes, Stock, Clientes, Productores) y reiniciará la aplicación.")) return;
+
+    setIsRefreshing(true);
+    try {
+      // 1. Limpiar localStorage de datos de esta almazara
+      const keysToClear = [
+        'app_vales', 'app_producers', 'app_customers', 'app_millingLots',
+        'app_productionLots', 'app_oilExits', 'app_salesOrders', 'app_pomaceExits',
+        'app_packagingLots', 'app_finishedProducts', 'app_auxEntries', 'app_oilMovements'
+      ];
+      keysToClear.forEach(k => localStorage.removeItem(k));
+      localStorage.removeItem('almazara_sync_queue');
+
+      // 2. Resetear estados locales a vacío o valores iniciales
+      setVales([]);
+      setProducers([]);
+      setCustomers([]);
+      setMillingLots([]);
+      setProductionLots([]);
+      setOilExits([]);
+      setSalesOrders([]);
+      setPomaceExits([]);
+      setPackagingLots([]);
+      setFinishedProducts([]);
+      setAuxEntries([]);
+      setOilMovements([]);
+
+      // Resetear tanques a 0
+      setTanks(prev => prev.map(t => ({ ...t, currentKg: 0, variety_id: undefined, currentBatchId: undefined, variety: undefined, status: 'FILLING' as const })));
+      setNurseTank(prev => ({ ...prev, currentKg: 0, currentBatchId: null, currentVariety: undefined }));
+
+      alert("Reinicio completado con éxito.");
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      alert("Error durante el reset.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleCleanupTestData = async () => {
+    if (!window.confirm("¿Seguro que quieres borrar todos los registros hasta el vale 3 (inclusive)? Esta acción es irreversible.")) return;
+
+    // Filtrar vales con id_vale <= 3
+    const toDelete = vales.filter(v => v.id_vale <= 3);
+
+    for (const v of toDelete) {
+      // 1. Borrar Vale
+      await deleteVale(v.id);
+
+      // 2. Intentar borrar registros relacionados de producción si existen
+      if (v.milling_lot_id) {
+        // Encontrar lote de molienda y borrarlo
+        const mLot = millingLots.find(m => m.id === v.milling_lot_id);
+        if (mLot) {
+          await deleteMillingLot(mLot.id);
+        }
+      }
+    }
+
+    alert(`Se han eliminado ${toDelete.length} registros de vales de prueba.`);
+    refreshAllData();
   };
 
   useEffect(() => {
@@ -972,7 +1074,7 @@ const App: React.FC = () => {
           // aquí solo manejamos cantidad. Pero al crear nuevas hay que guardarlas).
           return newHoppers;
         });
-      }} onArchiveCampaign={handleCloseCampaign} onStartCampaign={handleStartCampaign} pastCampaigns={appConfig.pastCampaigns} />;
+      }} onArchiveCampaign={handleCloseCampaign} onStartCampaign={handleStartCampaign} onCleanupTestData={handleCleanupTestData} onFullReset={handleFullReset} pastCampaigns={appConfig.pastCampaigns} />;
       default: return null;
     }
   };

@@ -137,7 +137,10 @@ export const DynamicDashboard: React.FC<DynamicDashboardProps> = ({
 
     const activeHoppers = useMemo(() => {
         return hoppers.map(h => {
-            const hopperVales = pendingVales.filter(v => v.ubicacion_id === h.id);
+            const hopperVales = pendingVales.filter(v =>
+                Number(v.ubicacion_id) === Number(h.id) &&
+                !v.milling_lot_id
+            );
             if (hopperVales.length === 0) return { ...h, status: 'empty', vales: [], totalKg: 0, theoreticalOil: 0, avgYield: 0, variety: '' };
 
             const currentUse = hopperVales[0].uso_contador;
@@ -159,8 +162,13 @@ export const DynamicDashboard: React.FC<DynamicDashboardProps> = ({
     const lowStockItems = useMemo(() => auxStock.filter(s => s.currentStock < config.lowStockThreshold), [auxStock, config.lowStockThreshold]);
 
     const todaysVales = useMemo(() => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        return vales.filter(v => v.fecha_entrada.startsWith(todayStr));
+        const now = new Date();
+        const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD local
+        return vales.filter(v => {
+            const isDateToday = v.fecha_entrada.startsWith(todayStr);
+            const isCreatedToday = v.created_at && new Date(v.created_at).toDateString() === now.toDateString();
+            return isDateToday || isCreatedToday;
+        });
     }, [vales]);
 
     const latestDirectSales = useMemo(() => {
@@ -365,11 +373,11 @@ export const DynamicDashboard: React.FC<DynamicDashboardProps> = ({
                     <p className="text-xs font-bold text-gray-400 mb-1 uppercase">Vales registrados</p>
                 </div>
                 <div className="space-y-2">
-                    {todaysVales.slice(0, 3).map(v => (
+                    {todaysVales.sort((a, b) => b.id_vale - a.id_vale).slice(0, 3).map(v => (
                         <div key={v.id_vale} className="flex justify-between items-center bg-gray-50 p-3 rounded-xl">
                             <div>
                                 <p className="text-xs font-black text-[#111111] truncate max-w-[150px]">{v.productor_name}</p>
-                                <p className="text-[10px] text-gray-500">{new Date(v.fecha_entrada).toLocaleTimeString()}</p>
+                                <p className="text-[10px] text-gray-500">{v.created_at ? new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(v.fecha_entrada).toLocaleDateString()}</p>
                             </div>
                             <span className="text-xs font-bold text-[#111111]">{v.kilos_netos} kg</span>
                         </div>

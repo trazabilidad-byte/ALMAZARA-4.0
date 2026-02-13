@@ -307,21 +307,22 @@ export const ValesForm: React.FC<ValesFormProps> = ({
             productor_id: formData.productor_id,
             productor_name: producer?.name || searchTerm || 'Desconocido',
             parcela: formData.parcela,
-            comprador: formData.comprador,
-            comprador_name: customerSearchTerm,
             fecha_entrada: new Date(formData.fecha).toISOString(),
             kilos_brutos: formData.kilos_brutos,
             impurezas_kg: formData.impurezas_kg,
             kilos_netos: kilosNetos,
-            variedad: formData.variedad,
-            ubicacion_id: formData.ubicacion_id,
-            uso_contador: formData.uso_contador,
+            variedad: formData.variedad as OliveVariety,
+            ubicacion_id: Number(formData.ubicacion_id),
+            uso_contador: Number(formData.uso_contador),
             estado: originalIds.estado,
             analitica: {
                 rendimiento_graso: Number(formData.rendimiento_graso),
                 acidez: Number(formData.acidez)
             },
-            campaign: originalIds.campaign
+            campaign: originalIds.campaign,
+            comprador: (formData.comprador && formData.comprador !== '') ? formData.comprador : undefined,
+            comprador_name: customerSearchTerm || formData.comprador_name || '',
+            created_at: editVale?.created_at || new Date().toISOString()
         };
         setTimeout(() => { onSave(newVale); setIsSubmitting(false); }, 600);
     };
@@ -419,7 +420,7 @@ export const ValesForm: React.FC<ValesFormProps> = ({
                                             ASIGNACIÓN DE TOLVA T{formData.ubicacion_id}
                                         </p>
                                         <div className="flex gap-2 flex-wrap">
-                                            {hoppers.map(hopper => (
+                                            {[...hoppers].sort((a, b) => a.id - b.id).map(hopper => (
                                                 <button
                                                     key={hopper.id}
                                                     type="button"

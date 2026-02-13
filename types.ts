@@ -241,6 +241,7 @@ export interface Vale {
   };
   campaign?: string; // Nuevo para histórico
   comprador_name?: string; // Nombre desnormalizado para sincronización
+  created_at?: string; // Nuevo: Fecha de creación para dashboard
 }
 
 // --- TIPOS NUEVOS PARA ENVASADORA ---

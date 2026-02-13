@@ -152,7 +152,7 @@ export const fetchVales = async (almazaraId?: string): Promise<Vale[]> => {
         impurezas_kg: 0,
         kilos_netos: Number(v.weight_kg),
         ubicacion_id: v.hopper_id,
-        uso_contador: 1,
+        uso_contador: Number(v.usage_count) || 1,
         estado: v.status as ValeStatus,
         milling_lot_id: v.milling_lot_id,
         analitica: {
@@ -161,7 +161,8 @@ export const fetchVales = async (almazaraId?: string): Promise<Vale[]> => {
         },
         comprador: v.customer_id, // Mapeamos el cliente
         comprador_name: v.customer_name,
-        campaign: v.campaign
+        campaign: v.campaign,
+        created_at: v.created_at
     })) as Vale[];
 };
 
@@ -182,6 +183,7 @@ export const upsertVale = async (vale: Vale, skipQueue = false) => {
             variety: vale.variedad,
             status: vale.estado as any,
             hopper_id: vale.ubicacion_id,
+            usage_count: Number(vale.uso_contador) || 1,
             milling_lot_id: vale.milling_lot_id || null,
             campaign: vale.campaign,
             customer_id: vale.comprador || null,
@@ -247,7 +249,8 @@ export const fetchHoppers = async (almazaraId?: string): Promise<Hopper[]> => {
     const { data, error } = await supabase
         .from('hoppers')
         .select('*')
-        .eq('almazara_id', id);
+        .eq('almazara_id', id)
+        .order('id', { ascending: true });
 
     if (error) {
         console.error('Error fetching hoppers:', error);
@@ -259,7 +262,7 @@ export const fetchHoppers = async (almazaraId?: string): Promise<Hopper[]> => {
         almazaraId: h.almazara_id,
         name: h.name,
         isActive: h.is_active,
-        currentUse: 1
+        currentUse: h.current_use || 1
     }));
 };
 
@@ -773,4 +776,55 @@ export const upsertOilExit = async (exit: OilExit, skipQueue = false) => {
         });
         return { error };
     }, skipQueue);
+};
+// --- FUNCIONES DE BORRADO ---
+
+export const deleteVale = async (id: string) => {
+    const { error } = await supabase.from('vales').delete().eq('id', id);
+    return { error };
+};
+
+export const deleteMillingLot = async (id: string) => {
+    const { error } = await supabase.from('milling_lots').delete().eq('id', id);
+    return { error };
+};
+
+export const deleteProductionLot = async (id: string) => {
+    const { error } = await supabase.from('production_lots').delete().eq('id', id);
+    return { error };
+};
+
+export const deletePackagingLot = async (id: string) => {
+    const { error } = await supabase.from('packaging_lots').delete().eq('id', id);
+    return { error };
+};
+
+export const deleteFinishedProduct = async (id: string) => {
+    const { error } = await supabase.from('finished_products').delete().eq('id', id);
+    return { error };
+};
+
+export const deleteOilMovement = async (id: string) => {
+    const { error } = await supabase.from('oil_movements').delete().eq('id', id);
+    return { error };
+};
+
+export const deleteSalesOrder = async (id: string) => {
+    const { error } = await supabase.from('sales_orders').delete().eq('id', id);
+    return { error };
+};
+
+export const deletePomaceExit = async (id: string) => {
+    const { error } = await supabase.from('pomace_exits').delete().eq('id', id);
+    return { error };
+};
+
+export const deleteAuxEntry = async (id: string) => {
+    const { error } = await supabase.from('aux_entries').delete().eq('id', id);
+    return { error };
+};
+
+export const deleteOilExit = async (id: string) => {
+    const { error } = await supabase.from('oil_exits').delete().eq('id', id);
+    return { error };
 };

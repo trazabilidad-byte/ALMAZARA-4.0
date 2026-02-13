@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { AppConfig, PackagingFormatDefinition, Vale, Producer, MillingLot, Tank, Customer, Hopper, NurseTank, AuxProductDefinition, AuthorizedUser, UserRole, SalesOrder, OilExit, ExitType, OliveVariety, ProductionLot, OilMovement } from '../types';
-import { Save, Layout, Beaker, Upload, Settings, Trash2, Plus, Database, Menu, LayoutDashboard, Eye, EyeOff, Scale, Package, Layers, Users, User, Shield, Archive, AlertOctagon, History, Download, X, Check, ArrowRight, FileSpreadsheet, Lock, Percent, MapPin, Phone, Mail, ChevronDown } from 'lucide-react';
+import { Save, Layout, Beaker, Upload, Settings, Trash2, Plus, Database, Menu, LayoutDashboard, Eye, EyeOff, Scale, Package, Layers, Users, User, Shield, Archive, AlertOctagon, History, Download, X, Check, ArrowRight, FileSpreadsheet, Lock, Percent, MapPin, Phone, Mail, ChevronDown, RefreshCw } from 'lucide-react';
 import { NAV_ITEMS } from '../constants';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -28,6 +28,8 @@ interface SettingsDashboardProps {
     selectedHistoryCampaign?: string | null;
     pastCampaigns: string[];
     onDownloadBackup?: () => void;
+    onCleanupTestData?: () => void;
+    onFullReset?: () => void;
 }
 
 const WIDGET_NAMES: Record<string, string> = {
@@ -60,7 +62,9 @@ export const SettingsDashboard: React.FC<SettingsDashboardProps> = ({
     onViewHistory,
     selectedHistoryCampaign,
     pastCampaigns,
-    onDownloadBackup
+    onDownloadBackup,
+    onCleanupTestData,
+    onFullReset
 }) => {
     const [formConfig, setFormConfig] = useState<AppConfig>(config);
     const [activeSection, setActiveSection] = useState<'general' | 'visual' | 'infra' | 'technical' | 'formats' | 'users' | 'data'>('general');
@@ -1244,9 +1248,18 @@ export const SettingsDashboard: React.FC<SettingsDashboardProps> = ({
                                     localStorage.removeItem('almazara_sync_queue');
                                     window.location.reload();
                                 }}
-                                className="w-full py-3 bg-red-900/30 hover:bg-red-900/50 text-red-200 border border-red-900/50 rounded-xl font-bold uppercase text-xs tracking-widest transition-all"
+                                className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-xl font-bold uppercase text-xs tracking-widest transition-all mb-4"
                             >
                                 Limpiar Cola de Sincronización
+                            </button>
+
+                            <h4 className="font-bold text-red-500 mb-2 uppercase text-[10px] tracking-widest">Reinicio Maestro de Aplicación</h4>
+                            <p className="text-[10px] text-gray-500 mb-4">Usa este botón si necesitas limpiar todos los datos locales y sincronizar de nuevo con el servidor (útil tras borrados manuales en base de datos).</p>
+                            <button
+                                onClick={onFullReset}
+                                className="w-full py-3 bg-red-900/40 hover:bg-red-900/60 text-red-200 border border-red-800/50 rounded-xl font-bold uppercase text-xs tracking-widest transition-all"
+                            >
+                                <RefreshCw size={14} className="inline mr-2" /> Forzar Reinicio de Datos
                             </button>
                         </div>
                     </div>
