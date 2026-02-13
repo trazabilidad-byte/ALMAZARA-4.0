@@ -151,6 +151,7 @@ export const ValesList: React.FC<ValesListProps> = ({ vales, onEdit, onView, onV
                 <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Nº Vale</th>
                 <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Fecha / Tipo</th>
                 <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Productor / Finca</th>
+                <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap text-center">Tolva / Uso</th>
                 <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap text-center">Variedad</th>
                 <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap text-right">Kilos Netos</th>
                 <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap text-center">Analítica Lab.</th>
@@ -194,6 +195,17 @@ export const ValesList: React.FC<ValesListProps> = ({ vales, onEdit, onView, onV
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1 truncate">
                       <MapPin size={10} className="shrink-0" /> {v.parcela}
                     </p>
+                  </td>
+                  <td className="px-6 py-5 text-center">
+                    {v.tipo_vale === ValeType.MOLTURACION ? (
+                      <div className="inline-flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100">
+                        <span className="text-[11px] font-black text-black">T{v.ubicacion_id}</span>
+                        <span className="text-[11px] font-bold text-gray-400">/</span>
+                        <span className="text-[11px] font-black text-blue-600">U{v.uso_contador}</span>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] font-bold text-gray-300 uppercase italic">N/A</span>
+                    )}
                   </td>
                   <td className="px-6 py-5 text-center">
                     <span className={`px-2 py-1 rounded-md text-[9px] font-black uppercase border inline-block whitespace-nowrap ${v.variedad === OliveVariety.PICUAL ? 'bg-green-50 text-green-700 border-green-100' :
