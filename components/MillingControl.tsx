@@ -87,7 +87,8 @@ export const MillingControl: React.FC<MillingControlProps> = ({
                     totalKg,
                     theoreticalOil,
                     avgYield,
-                    variety: batchVales[0].variedad
+                    variety: batchVales[0].variedad,
+                    fecha: batchVales[0].fecha
                 };
             });
 
@@ -112,7 +113,7 @@ export const MillingControl: React.FC<MillingControlProps> = ({
             uso: batch.uso,
             realOil: 0,
             targetTankId: 0,
-            date: new Date().toISOString()
+            date: batch.fecha || new Date().toISOString()
         });
     };
 
