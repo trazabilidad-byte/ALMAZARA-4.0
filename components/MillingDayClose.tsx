@@ -120,8 +120,11 @@ export const MillingDayClose: React.FC<MillingDayCloseProps> = ({
         // Calcular Aceituna y Teórico RECALCULADO (Jerarquía: Lab > Config > Default)
         const lotDetails = selectedLots.map(l => {
             // Obtener vales asociados
-            // Obtener vales asociados (FIX: Comparación robusta de tipos string/number)
-            const lotVales = vales.filter(v => l.vales_ids.some(id => String(id) === String(v.id_vale)));
+            // Obtener vales asociados (FIX: Comparación robusta string/number Y fallback a milling_lot_id)
+            const lotVales = vales.filter(v =>
+                l.vales_ids.some(id => String(id) === String(v.id_vale)) ||
+                (v.milling_lot_id && String(v.milling_lot_id) === String(l.id))
+            );
 
             let lotOliveKg = 0;
             let lotTheoreticalOil = 0;

@@ -88,7 +88,7 @@ export const MillingControl: React.FC<MillingControlProps> = ({
                     theoreticalOil,
                     avgYield,
                     variety: batchVales[0].variedad,
-                    fecha: batchVales[0].fecha
+                    fecha: batchVales[0].fecha_entrada
                 };
             });
 
