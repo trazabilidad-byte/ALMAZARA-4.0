@@ -137,7 +137,8 @@ export const DynamicDashboard: React.FC<DynamicDashboardProps> = ({
 
     const activeHoppersData = useMemo(() => {
         return hoppers.map(h => {
-            const hopperVales = pendingVales.filter(v =>
+            const hopperVales = vales.filter(v =>
+                v.estado === 'Pendiente' &&
                 Number(v.ubicacion_id) === Number(h.id) &&
                 v.tipo_vale === ValeType.MOLTURACION &&
                 !v.milling_lot_id
@@ -410,7 +411,7 @@ export const DynamicDashboard: React.FC<DynamicDashboardProps> = ({
                         <div key={v.id_vale} className="flex justify-between items-center bg-gray-50 p-3 rounded-xl">
                             <div>
                                 <p className="text-xs font-black text-[#111111] truncate max-w-[150px]">{v.productor_name}</p>
-                                <p className="text-[10px] text-gray-500">{v.created_at ? new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(v.fecha_entrada).toLocaleDateString()}</p>
+                                <p className="text-[10px] text-gray-500">{v.created_at || v.fecha_entrada ? new Date(v.created_at || v.fecha_entrada).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '---'}</p>
                             </div>
                             <span className="text-xs font-bold text-[#111111]">{v.kilos_netos} kg</span>
                         </div>

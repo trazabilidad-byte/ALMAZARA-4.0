@@ -424,12 +424,12 @@ export const MillingControl: React.FC<MillingControlProps> = ({
                             {openMillingLots.map(mt => (
                                 <tr key={mt.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-4">
-                                        <button
+                                        <div
                                             onClick={() => onViewLotDetail && onViewLotDetail(mt.id)}
-                                            className="text-sm font-black text-[#111111] hover:text-[#D9FF66] hover:bg-black px-2 py-1 rounded transition-colors"
+                                            className="text-sm font-black text-[#111111] hover:text-[#D9FF66] hover:bg-black px-2 py-1 rounded transition-colors cursor-pointer inline-block"
                                         >
                                             {mt.id}
-                                        </button>
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-xs font-bold text-gray-500">{new Date(mt.fecha).toLocaleDateString()}</td>
                                     <td className="px-6 py-4 text-center">
